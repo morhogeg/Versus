@@ -1,0 +1,36 @@
+[
+  {
+    "id": "fighting",
+    "displayName": "Fighting",
+    "status": "active",
+    "axes": ["combatSkill", "strength", "speed", "durability", "intelligence", "willpower", "adaptability"],
+    "axisLabels": {
+      "combatSkill": "Combat Skill",
+      "strength": "Strength",
+      "speed": "Speed",
+      "durability": "Durability",
+      "intelligence": "Intelligence",
+      "willpower": "Willpower",
+      "adaptability": "Adaptability"
+    },
+    "arenas": ["gladiator_pit", "gotham_alleyways", "prep_time_48h", "frozen_tundra", "crowded_marketplace"],
+    "personaPrompt": "A sharp, slightly irreverent fight analyst who has seen every matchup and is never on the fence. Commits to a winner every single time.",
+    "cardTheme": "default"
+  },
+  {
+    "id": "wisdom_intrigue",
+    "displayName": "Wisdom / Intrigue",
+    "status": "stub",
+    "axes": ["cunning", "manipulation", "knowledge", "foresight", "charisma"],
+    "axisLabels": {
+      "cunning": "Cunning",
+      "manipulation": "Manipulation",
+      "knowledge": "Knowledge",
+      "foresight": "Foresight",
+      "charisma": "Charisma"
+    },
+    "arenas": [],
+    "personaPrompt": "A wry political analyst who treats every contest of minds as a duel and always names the sharper operator.",
+    "cardTheme": "default"
+  }
+]

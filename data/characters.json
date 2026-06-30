@@ -1,0 +1,216 @@
+[
+  {
+    "id": "jaime_lannister",
+    "displayName": "Jaime Lannister",
+    "universe": "Game of Thrones",
+    "archetype": "warrior",
+    "tier": "S",
+    "portraitKey": "jaime_lannister",
+    "accentHint": "#E8C766",
+    "baseStats": { "combatSkill": 88, "strength": 80, "speed": 78, "durability": 74, "intelligence": 70, "willpower": 68, "adaptability": 70 },
+    "traits": [
+      { "key": "master_swordsman", "label": "One of the finest blades in the realm", "weight": 0.9 },
+      { "key": "knightly_instinct", "label": "Reads a duel a beat ahead", "weight": 0.6 }
+    ],
+    "gear": [ { "key": "longsword", "label": "Valyrian-grade longsword" }, { "key": "plate", "label": "Golden plate armor" } ],
+    "weaknesses": [ { "key": "overconfidence", "label": "Arrogance makes him take fights he should refuse" } ],
+    "vibeTags": ["proud", "lethal", "reckless", "charming"],
+    "loreBlurb": "A golden-armored swordsman whose blade outshines his judgment."
+  },
+  {
+    "id": "jon_snow",
+    "displayName": "Jon Snow",
+    "universe": "Game of Thrones",
+    "archetype": "warrior",
+    "tier": "A",
+    "portraitKey": "jon_snow",
+    "accentHint": "#8FB7C9",
+    "baseStats": { "combatSkill": 82, "strength": 76, "speed": 74, "durability": 80, "intelligence": 66, "willpower": 88, "adaptability": 73 },
+    "traits": [
+      { "key": "unbreakable_resolve", "label": "Comes back from anything, literally", "weight": 0.9 },
+      { "key": "frontline_leader", "label": "Fights hardest when outnumbered", "weight": 0.7 }
+    ],
+    "gear": [ { "key": "longclaw", "label": "Valyrian-steel longsword Longclaw" } ],
+    "weaknesses": [ { "key": "honor_bound", "label": "Honor makes him predictable to a schemer" } ],
+    "vibeTags": ["dutiful", "stubborn", "brave", "haunted"],
+    "loreBlurb": "A grim northern soldier who refuses to stay dead or stay down."
+  },
+  {
+    "id": "tommy_shelby",
+    "displayName": "Tommy Shelby",
+    "universe": "Peaky Blinders",
+    "archetype": "tactician",
+    "tier": "A",
+    "portraitKey": "tommy_shelby",
+    "accentHint": "#3AE0C0",
+    "baseStats": { "combatSkill": 72, "strength": 58, "speed": 62, "durability": 64, "intelligence": 92, "willpower": 88, "adaptability": 86 },
+    "traits": [
+      { "key": "tactical_foresight", "label": "Plans three moves ahead", "weight": 0.9 },
+      { "key": "fearlessness", "label": "Has already made peace with death", "weight": 0.8 }
+    ],
+    "gear": [ { "key": "razor_cap", "label": "Razor-blade flat cap" }, { "key": "revolver", "label": "Service revolver" } ],
+    "weaknesses": [ { "key": "no_powers", "label": "Entirely mortal — no enhancements" } ],
+    "vibeTags": ["cold", "calculating", "loyal", "haunted"],
+    "loreBlurb": "A WW1-hardened gang strategist who wins wars before they start."
+  },
+  {
+    "id": "lincoln_burrows",
+    "displayName": "Lincoln Burrows",
+    "universe": "Prison Break",
+    "archetype": "bruiser",
+    "tier": "B",
+    "portraitKey": "lincoln_burrows",
+    "baseStats": { "combatSkill": 76, "strength": 82, "speed": 66, "durability": 80, "intelligence": 60, "willpower": 78, "adaptability": 62 },
+    "traits": [
+      { "key": "raw_power", "label": "Hits like a wrecking ball", "weight": 0.8 },
+      { "key": "survivor_grit", "label": "Endured death row and worse", "weight": 0.6 }
+    ],
+    "gear": [ { "key": "shiv", "label": "Improvised shiv" } ],
+    "weaknesses": [ { "key": "outthought", "label": "A planner runs rings around him" } ],
+    "vibeTags": ["brawny", "loyal", "blunt", "dogged"],
+    "loreBlurb": "A heavyweight ex-con who solves most problems with his fists."
+  },
+  {
+    "id": "geralt_of_rivia",
+    "displayName": "Geralt of Rivia",
+    "universe": "The Witcher",
+    "archetype": "mystic",
+    "tier": "S",
+    "portraitKey": "geralt_of_rivia",
+    "accentHint": "#C9CDD6",
+    "baseStats": { "combatSkill": 92, "strength": 84, "speed": 86, "durability": 88, "intelligence": 78, "willpower": 88, "adaptability": 86 },
+    "traits": [
+      { "key": "witcher_mutations", "label": "Superhuman reflexes and senses", "weight": 1.0 },
+      { "key": "sign_magic", "label": "Casts battlefield signs", "weight": 0.7 }
+    ],
+    "gear": [ { "key": "silver_sword", "label": "Silver sword for monsters" }, { "key": "steel_sword", "label": "Steel sword for men" } ],
+    "weaknesses": [ { "key": "toxicity", "label": "Combat potions poison him over time" } ],
+    "vibeTags": ["stoic", "enhanced", "veteran", "deadly"],
+    "loreBlurb": "A mutant monster-hunter with reflexes no mortal can match."
+  },
+  {
+    "id": "walter_white",
+    "displayName": "Walter White",
+    "universe": "Breaking Bad",
+    "archetype": "mastermind",
+    "tier": "C",
+    "portraitKey": "walter_white",
+    "accentHint": "#7FB069",
+    "baseStats": { "combatSkill": 30, "strength": 48, "speed": 50, "durability": 52, "intelligence": 98, "willpower": 80, "adaptability": 76 },
+    "traits": [
+      { "key": "chemistry_genius", "label": "Turns anything into a weapon", "weight": 1.0 },
+      { "key": "ruthless_pragmatism", "label": "No line he won't cross to win", "weight": 0.8 }
+    ],
+    "gear": [ { "key": "ricin", "label": "A vial of ricin" }, { "key": "improvised_explosives", "label": "Homemade explosives" } ],
+    "weaknesses": [ { "key": "physically_frail", "label": "Loses instantly without time to prepare" } ],
+    "vibeTags": ["brilliant", "vain", "ruthless", "desperate"],
+    "loreBlurb": "A dying chemistry teacher who wins only when given time to think."
+  },
+  {
+    "id": "beatrix_kiddo",
+    "displayName": "Beatrix Kiddo",
+    "universe": "Kill Bill",
+    "archetype": "warrior",
+    "tier": "S",
+    "portraitKey": "beatrix_kiddo",
+    "accentHint": "#F2D14E",
+    "baseStats": { "combatSkill": 94, "strength": 70, "speed": 88, "durability": 78, "intelligence": 76, "willpower": 96, "adaptability": 80 },
+    "traits": [
+      { "key": "deadly_viper", "label": "Trained in every killing art", "weight": 0.9 },
+      { "key": "roaring_rampage", "label": "Pain only sharpens her focus", "weight": 0.8 }
+    ],
+    "gear": [ { "key": "hattori_hanzo", "label": "Hattori Hanzo katana" } ],
+    "weaknesses": [ { "key": "tunnel_vision", "label": "Vengeance can blind her to a trap" } ],
+    "vibeTags": ["relentless", "precise", "vengeful", "unstoppable"],
+    "loreBlurb": "A sword-saint assassin who walks through pain toward her target."
+  },
+  {
+    "id": "arya_stark",
+    "displayName": "Arya Stark",
+    "universe": "Game of Thrones",
+    "archetype": "tactician",
+    "tier": "B",
+    "portraitKey": "arya_stark",
+    "accentHint": "#9AA0AE",
+    "baseStats": { "combatSkill": 80, "strength": 52, "speed": 84, "durability": 66, "intelligence": 78, "willpower": 82, "adaptability": 90 },
+    "traits": [
+      { "key": "stealth", "label": "Moves unseen, strikes from nowhere", "weight": 0.9 },
+      { "key": "faceless_training", "label": "Becomes anyone to get close", "weight": 0.8 }
+    ],
+    "gear": [ { "key": "needle", "label": "Thin blade 'Needle'" }, { "key": "valyrian_dagger", "label": "Valyrian-steel dagger" } ],
+    "weaknesses": [ { "key": "small_frame", "label": "Overpowered in a straight grapple" } ],
+    "vibeTags": ["lethal", "silent", "adaptable", "cold"],
+    "loreBlurb": "A pint-sized faceless assassin who kills before you know she's there."
+  },
+  {
+    "id": "omar_little",
+    "displayName": "Omar Little",
+    "universe": "The Wire",
+    "archetype": "survivor",
+    "tier": "B",
+    "portraitKey": "omar_little",
+    "baseStats": { "combatSkill": 76, "strength": 70, "speed": 74, "durability": 66, "intelligence": 76, "willpower": 80, "adaptability": 84 },
+    "traits": [
+      { "key": "stealth", "label": "Ghosts through the city unseen", "weight": 0.8 },
+      { "key": "street_read", "label": "Reads a block like a battlefield", "weight": 0.8 }
+    ],
+    "gear": [ { "key": "shotgun", "label": "Sawed-off shotgun" }, { "key": "longcoat", "label": "Signature duster" } ],
+    "weaknesses": [ { "key": "code_bound", "label": "His code makes some moves off-limits" } ],
+    "vibeTags": ["feared", "principled", "cunning", "calm"],
+    "loreBlurb": "A stickup artist who robs the game itself and lives by a code."
+  },
+  {
+    "id": "the_t800",
+    "displayName": "The T-800",
+    "universe": "The Terminator",
+    "archetype": "bruiser",
+    "tier": "S",
+    "portraitKey": "the_t800",
+    "accentHint": "#C0392B",
+    "baseStats": { "combatSkill": 82, "strength": 95, "speed": 72, "durability": 99, "intelligence": 70, "willpower": 99, "adaptability": 50 },
+    "traits": [
+      { "key": "machine_body", "label": "A living-metal endoskeleton", "weight": 1.0 },
+      { "key": "relentless", "label": "Absolutely will not stop, ever", "weight": 0.9 }
+    ],
+    "gear": [ { "key": "plasma_rifle", "label": "Phased-plasma rifle" } ],
+    "weaknesses": [ { "key": "inflexibility", "label": "Cannot improvise outside its programming" } ],
+    "vibeTags": ["machine", "unstoppable", "cold", "literal"],
+    "loreBlurb": "An unkillable killing machine that simply does not quit."
+  },
+  {
+    "id": "furiosa",
+    "displayName": "Furiosa",
+    "universe": "Mad Max",
+    "archetype": "survivor",
+    "tier": "B",
+    "portraitKey": "furiosa",
+    "accentHint": "#E07B39",
+    "baseStats": { "combatSkill": 80, "strength": 68, "speed": 76, "durability": 78, "intelligence": 78, "willpower": 92, "adaptability": 84 },
+    "traits": [
+      { "key": "wasteland_grit", "label": "Forged by the worst the desert offers", "weight": 0.9 },
+      { "key": "war_rig_driver", "label": "Turns any vehicle into a weapon", "weight": 0.6 }
+    ],
+    "gear": [ { "key": "mech_arm", "label": "Prosthetic mechanical arm" }, { "key": "revolver", "label": "Worn revolver" } ],
+    "weaknesses": [ { "key": "one_arm", "label": "A missing arm limits raw grappling power" } ],
+    "vibeTags": ["hardened", "driven", "resourceful", "fierce"],
+    "loreBlurb": "A one-armed road warrior who outlasts everything the waste throws at her."
+  },
+  {
+    "id": "hannibal_lecter",
+    "displayName": "Hannibal Lecter",
+    "universe": "The Silence of the Lambs",
+    "archetype": "mastermind",
+    "tier": "B",
+    "portraitKey": "hannibal_lecter",
+    "accentHint": "#8E44AD",
+    "baseStats": { "combatSkill": 76, "strength": 70, "speed": 70, "durability": 60, "intelligence": 99, "willpower": 90, "adaptability": 88 },
+    "traits": [
+      { "key": "predatory_genius", "label": "Dissects a mind before the body", "weight": 1.0 },
+      { "key": "clinical_calm", "label": "Never rushes, never panics", "weight": 0.8 }
+    ],
+    "gear": [ { "key": "scalpel", "label": "Surgical scalpel" } ],
+    "weaknesses": [ { "key": "toys_with_prey", "label": "Savors the kill instead of finishing it" } ],
+    "vibeTags": ["refined", "predatory", "patient", "terrifying"],
+    "loreBlurb": "A genius cannibal who turns your own mind into the murder weapon."
+  }
+]

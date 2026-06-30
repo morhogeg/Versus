@@ -1,0 +1,44 @@
+[
+  {
+    "fighterA": "tommy_shelby",
+    "fighterB": "jaime_lannister",
+    "arena": "gotham_alleyways",
+    "source": "featured",
+    "blurb": "Brains in the dark vs. a blade in the light."
+  },
+  {
+    "fighterA": "walter_white",
+    "fighterB": "hannibal_lecter",
+    "arena": "prep_time_48h",
+    "source": "featured",
+    "blurb": "Two masterminds, two days, one survivor."
+  },
+  {
+    "fighterA": "geralt_of_rivia",
+    "fighterB": "the_t800",
+    "arena": "frozen_tundra",
+    "source": "featured",
+    "blurb": "The mutant vs. the machine, in killing cold."
+  },
+  {
+    "fighterA": "beatrix_kiddo",
+    "fighterB": "arya_stark",
+    "arena": "gladiator_pit",
+    "source": "featured",
+    "blurb": "Sword-saint against silent killer, out in the open."
+  },
+  {
+    "fighterA": "omar_little",
+    "fighterB": "lincoln_burrows",
+    "arena": "crowded_marketplace",
+    "source": "featured",
+    "blurb": "The stickup ghost vs. the wrecking ball in a crowd."
+  },
+  {
+    "fighterA": "furiosa",
+    "fighterB": "jon_snow",
+    "arena": "frozen_tundra",
+    "source": "featured",
+    "blurb": "Two survivors who simply will not freeze."
+  }
+]

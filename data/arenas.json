@@ -1,0 +1,78 @@
+[
+  {
+    "id": "gladiator_pit",
+    "displayName": "Gladiator Pit",
+    "description": "Open sand, blazing sun, a roaring crowd. Nowhere to hide, nothing to hide behind.",
+    "modifiers": [
+      { "stat": "strength", "op": "scale", "value": 1.2, "appliesTo": "all" },
+      { "stat": "combatSkill", "op": "scale", "value": 1.15, "appliesTo": "all" },
+      { "stat": "intelligence", "op": "scale", "value": 0.8, "appliesTo": "all" },
+      { "stat": "adaptability", "op": "scale", "value": 0.8, "appliesTo": "all" }
+    ],
+    "rules": [
+      "A straight fight to submission — raw force and skill decide it.",
+      "No tools, no terrain, no tricks. Only what you can do with your hands and your blade."
+    ],
+    "promptFlavor": "A brutal open arena where strength and steel win and clever plans wither."
+  },
+  {
+    "id": "gotham_alleyways",
+    "displayName": "Gotham Alleyways",
+    "description": "Cramped, rain-slicked, pitch-dark. Close quarters. No room to run.",
+    "modifiers": [
+      { "stat": "speed", "op": "scale", "value": 0.8, "appliesTo": "all" },
+      { "stat": "intelligence", "op": "scale", "value": 1.1, "appliesTo": "all" },
+      { "stat": "combatSkill", "op": "scale", "value": 1.15, "appliesTo": "all", "condition": { "trait": "stealth" } }
+    ],
+    "rules": [
+      "Visibility is near zero — ranged advantages are heavily reduced.",
+      "No escape routes — the fight resolves to a conclusion."
+    ],
+    "promptFlavor": "A claustrophobic urban kill-box where cunning beats brawn."
+  },
+  {
+    "id": "prep_time_48h",
+    "displayName": "48-Hour Prep Time",
+    "description": "Two days to plan, gather tools, and set traps before the fight begins.",
+    "modifiers": [
+      { "stat": "intelligence", "op": "scale", "value": 1.2, "appliesTo": "all" },
+      { "stat": "adaptability", "op": "scale", "value": 1.2, "appliesTo": "all" },
+      { "stat": "combatSkill", "op": "scale", "value": 0.85, "appliesTo": "all" }
+    ],
+    "rules": [
+      "Each fighter gets two days to prepare the battlefield.",
+      "The fight is won in preparation as much as in the moment."
+    ],
+    "promptFlavor": "A chess match with a deadline — the better planner walks away."
+  },
+  {
+    "id": "frozen_tundra",
+    "displayName": "Frozen Tundra",
+    "description": "A sub-zero whiteout with no shelter and no end to the cold.",
+    "modifiers": [
+      { "stat": "willpower", "op": "scale", "value": 1.15, "appliesTo": "all" },
+      { "stat": "durability", "op": "scale", "value": 1.15, "appliesTo": "all" },
+      { "stat": "speed", "op": "scale", "value": 0.8, "appliesTo": "all" }
+    ],
+    "rules": [
+      "Exposure punishes anyone who can't endure.",
+      "The cold never stops — stamina and grit outlast finesse."
+    ],
+    "promptFlavor": "A merciless frozen waste where the unkillable and the unbreakable thrive."
+  },
+  {
+    "id": "crowded_marketplace",
+    "displayName": "Crowded Marketplace",
+    "description": "A dense, chaotic bazaar — improvisation and cover everywhere.",
+    "modifiers": [
+      { "stat": "adaptability", "op": "scale", "value": 1.2, "appliesTo": "all" },
+      { "stat": "intelligence", "op": "scale", "value": 1.1, "appliesTo": "all" },
+      { "stat": "strength", "op": "scale", "value": 0.85, "appliesTo": "all" }
+    ],
+    "rules": [
+      "Brute force is smothered by the crowd and the clutter.",
+      "Reading the room — and using it — wins."
+    ],
+    "promptFlavor": "A teeming bazaar that rewards improvisers and punishes the code-bound."
+  }
+]
