@@ -1,1 +1,0 @@
-menu_hello_touch menu_again_touch sky_intro_touch plane_intro_touch free_intro_touch pet_hint_touch
