@@ -17,7 +17,7 @@ OUT = os.path.join(ROOT, 'assets', 'voice')
 MODEL = os.environ.get('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts')
 VOICE = os.environ.get('GEMINI_TTS_VOICE', 'Leda')  # a warm, youthful voice
 STYLE = ('Read this aloud in Hebrew, in a warm, happy, gentle voice, like a kind kindergarten teacher '
-         'talking to a 4-year-old boy named Michael (so always the masculine forms: lech, not lechi).  Speak clearly and a little slowly, with a smile. '
+         'talking to a 4-year-old boy named Michael (he is a boy, so use masculine Hebrew forms). Speak clearly and a little slowly, with a smile. '
          'Say only the sentence, exactly as written:\n')
 # Flash-Lite reads a style note in the message aloud, so for it the note goes in the system instruction instead.
 LITE = 'lite' in MODEL

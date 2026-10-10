@@ -63,7 +63,7 @@ def main():
             print('ERROR  ', vid); bad.append(vid); continue
         time.sleep(4)
         score = difflib.SequenceMatcher(None, plain(text), plain(heard)).ratio()
-        ok = score >= 0.8
+        ok = score >= 0.95
         print('ok     ' if ok else 'BAD    ', vid, f'{score:.2f}', '|', plain(heard))
         if not ok: bad.append(vid)
     open('bad_voices.txt', 'w').write(' '.join(bad))
