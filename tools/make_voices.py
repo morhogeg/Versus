@@ -34,6 +34,8 @@ def call(url, headers, body):
 def synthesize(text, key, attempt=0):
     # Very short lines (one word) sometimes come back without audio, so later tries ask a little differently.
     prompt = STYLE + text if attempt < 2 else STYLE + 'Say it once, cheerfully: ' + text
+    if 'lite' in MODEL:  # Flash-Lite reads instructions aloud instead of following them, so send only the sentence
+        prompt = text
     body = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
         'generationConfig': {
