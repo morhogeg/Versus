@@ -2,7 +2,9 @@
 /* =====================================================================
    AIRPLANE'S LAND
    A gentle, no-lose exploring game for Michael (age 4½).
-   Controls: the ARROW KEYS. (Grown-ups: press M to mute / unmute.)
+   Controls: the ARROW KEYS to walk, the SPACE BAR to pick an activity
+   and to pat dragons and dinos.
+   Grown-ups: M = sound on/off, B = background music on/off, Esc = back to the menu.
 
    HOW THIS FILE IS ORGANISED (search for the section numbers):
      1. CONFIG .............. colors, sizes, speeds, how many things
@@ -12,8 +14,8 @@
      5. Screen & keys ....... canvas scaling and arrow-key input
      6. Building the world .. where everything is placed
      7. Particles ........... sparkles, hearts, confetti, smoke
-     8. Activities .......... sky hunt, hide & seek, feeding, grumpy dragon,
-                              airplane ride, house + TV
+     8. Activities .......... menu, sky hunt, hide & seek, feeding, grumpy dragon,
+                              airplane ride, house + TV, patting creatures
      9. Updating ............ everything that moves each frame
     10. Drawing ............. how everything looks
     11. Main loop
@@ -51,9 +53,11 @@ const CONFIG = {
   GRUMPY_GETS_GRUMPY_AGAIN_AFTER: 120, // seconds of happiness before he needs cheering up again (0 = stays happy)
   FLIGHT_SECONDS: 18,                  // airplane ride length
   PARADE_SECONDS: 16,                  // dragon parade length
+  FEEDS_TO_FINISH: 3,                  // "Feed the Dragons" is done after this many happy meals
 
   // ----- Sound & feel -----
   SOUND_VOLUME: 0.6,   // 0 = silent, 1 = loud
+  MUSIC_VOLUME: 0.5,   // soft background music (0 = no music)
   SCREEN_SHAKE: true,  // the grumpy dragon's stomp gives a tiny wobble
 
   // ----- World colors -----
@@ -250,6 +254,8 @@ const Sound = {
       this.master = this.ctx.createGain();
       this.master.gain.value = CONFIG.SOUND_VOLUME;
       this.master.connect(this.ctx.destination);
+      this.tuneBus = this.ctx.createGain(); // little songs go here so they can be stopped
+      this.tuneBus.connect(this.master);
       // one second of white noise, reused for puffs, chomps, whooshes
       const len = this.ctx.sampleRate;
       this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -265,7 +271,7 @@ const Sound = {
   },
 
   // One note. The pitch can slide from f1 to f2.
-  tone(f1, f2, dur, type = 'sine', vol = 0.3, delay = 0) {
+  tone(f1, f2, dur, type = 'sine', vol = 0.3, delay = 0, dest = null) {
     if (!this.ready()) return;
     const t = this.ctx.currentTime + delay;
     const o = this.ctx.createOscillator();
@@ -276,7 +282,7 @@ const Sound = {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.master);
+    o.connect(g); g.connect(dest || this.master);
     o.start(t); o.stop(t + dur + 0.05);
   },
   // A burst of filtered noise (whoosh, puff, crunch). Filter frequency can slide.
@@ -301,11 +307,18 @@ const Sound = {
     let t = delay;
     for (let r = 0; r < repeat; r++) {
       for (const [m, b] of notes) {
-        if (m) { const f = 440 * Math.pow(2, (m - 69) / 12); this.tone(f, f, b * beat * 0.9, type, vol, t); }
+        if (m) { const f = 440 * Math.pow(2, (m - 69) / 12); this.tone(f, f, b * beat * 0.9, type, vol, t, this.tuneBus); }
         t += b * beat;
       }
     }
     return t;
+  },
+  // Silences any song that is still playing (e.g. when going back to the menu)
+  stopTunes() {
+    if (!this.ctx) return;
+    this.tuneBus.disconnect();
+    this.tuneBus = this.ctx.createGain();
+    this.tuneBus.connect(this.master);
   },
 
   // ---- The game's sounds ----
@@ -345,6 +358,10 @@ const Sound = {
   },
   fanfare() { this.playTune([[72, 0.5], [76, 0.5], [79, 0.5], [84, 1.5], [79, 0.5], [84, 2]], 220, 'square', 0.07); },
   chime()   { this.tone(1568, 1568, 0.5, 'sine', 0.15); this.tone(2093, 2093, 0.6, 'sine', 0.12, 0.15); },
+  tick()    { this.tone(900, 1100, 0.05, 'triangle', 0.15); },
+  purr()    { for (let i = 0; i < 5; i++) this.tone(180 + (i % 2) * 30, 200 + (i % 2) * 30, 0.12, 'triangle', 0.16, i * 0.11); this.tone(880, 1180, 0.15, 'sine', 0.1, 0.55); },
+  rawr(p = 1) { this.tone(420 * p, 260 * p, 0.28, 'sawtooth', 0.05); this.tone(640 * p, 380 * p, 0.28, 'triangle', 0.18); },
+  sparkleBreath() { this.noise(0.8, 0.05, 'bandpass', 2000, 0, 5000); for (let i = 0; i < 6; i++) this.tone(1400 + i * 220, 1500 + i * 220, 0.15, 'triangle', 0.07, 0.1 + i * 0.1); },
 
   // Airplane engine hum (starts and stops)
   startEngine() {
@@ -379,6 +396,67 @@ const TUNES = {
   landing: [[72, 0.5], [79, 0.5], [76, 0.5], [84, 1.5]],
   tv: [[76, 0.5], [79, 0.5], [84, 0.5], [79, 0.5], [81, 1]],
   happyDragon: [[72, 0.5], [74, 0.5], [76, 0.5], [79, 0.5], [84, 0.5], [79, 0.5], [84, 1.5]],
+  dance: [[72, 0.5], [76, 0.5], [79, 0.5], [76, 0.5], [81, 0.5], [79, 0.5], [84, 1]],
+};
+
+// ---------- Background music ----------
+// A gentle music-box tune over soft chords (C - Am - F - G), looping forever.
+// Notes are scheduled a little ahead of time so it never stutters.
+const MUSIC_STEP = 0.32; // seconds per eighth note
+const MUSIC_CHORDS = [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]];
+const MUSIC_BASS = [48, 45, 41, 43];
+const MUSIC_MELODY = [ // 8 bars of 8 eighth notes (0 = rest)
+  [76, 0, 79, 0, 84, 0, 79, 0], [76, 0, 72, 0, 69, 0, 72, 0], [77, 0, 81, 0, 84, 0, 81, 0], [79, 0, 74, 0, 71, 0, 74, 0],
+  [72, 0, 76, 0, 79, 0, 0, 0], [81, 0, 79, 0, 76, 0, 0, 0], [77, 0, 76, 0, 72, 0, 69, 0], [71, 0, 74, 0, 79, 0, 0, 0],
+];
+const Music = {
+  bus: null, playing: false, enabled: true, level: 1, nextTime: 0, step: 0,
+  start() {
+    if (this.playing || !Sound.ready() || !CONFIG.MUSIC_VOLUME) return;
+    this.bus = Sound.ctx.createGain();
+    this.bus.gain.value = 0;
+    this.bus.gain.setTargetAtTime(CONFIG.MUSIC_VOLUME, Sound.ctx.currentTime, 1.5); // fade in
+    this.bus.connect(Sound.master);
+    this.nextTime = Sound.ctx.currentTime + 0.2;
+    this.playing = true;
+    setInterval(() => this.schedule(), 120);
+  },
+  // Turn the music down (e.g. during the parade song) or back up. level 0..1
+  setLevel(level) {
+    const target = this.enabled ? level : 0;
+    if (!this.bus || this.level === target) return;
+    this.level = target;
+    this.bus.gain.setTargetAtTime(CONFIG.MUSIC_VOLUME * target, Sound.ctx.currentTime, 0.4);
+  },
+  toggle() { this.enabled = !this.enabled; this.level = -1; },
+  schedule() {
+    const now = Sound.ctx.currentTime;
+    if (this.nextTime < now) this.nextTime = now + 0.05; // after the tab was asleep
+    while (this.nextTime < now + 0.4) { this.playStep(this.step, this.nextTime); this.nextTime += MUSIC_STEP; this.step++; }
+  },
+  note(midi, t, dur, type, vol, attack) {
+    const ctx = Sound.ctx, f = 440 * Math.pow(2, (midi - 69) / 12);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.bus);
+    o.start(t); o.stop(t + dur + 0.05);
+  },
+  playStep(s, t) {
+    const bar = Math.floor(s / 8) % MUSIC_MELODY.length, i = s % 8, chord = bar % 4;
+    if (i === 0) {
+      for (const m of MUSIC_CHORDS[chord]) this.note(m, t, MUSIC_STEP * 8, 'sine', 0.035, 0.5);   // soft pad
+      this.note(MUSIC_BASS[chord], t, MUSIC_STEP * 6, 'triangle', 0.07, 0.05);                     // bass
+    }
+    if (i === 4) this.note(MUSIC_BASS[chord] + 7, t, MUSIC_STEP * 3, 'triangle', 0.045, 0.05);
+    const m = MUSIC_MELODY[bar][i];
+    if (m) { // music box: a bell-like note plus a quiet octave
+      this.note(m, t, 1.1, 'sine', 0.06, 0.01);
+      this.note(m + 12, t, 0.5, 'sine', 0.015, 0.01);
+    }
+  },
 };
 
 
@@ -588,15 +666,22 @@ const KEYMAP = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDow
 window.addEventListener('keydown', (e) => {
   Sound.unlock();
   const k = KEYMAP[e.key];
-  if (k) { keys[k] = true; game.started = true; e.preventDefault(); }
+  if (k) {
+    keys[k] = true; e.preventDefault();
+    if (game.mode === 'menu') { if (!e.repeat) moveMenuSelection(k); }
+    else game.started = true;
+  }
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!e.repeat) pressAction(); }
+  if (e.key === 'Escape') goMenu();
   if (e.key === 'm' || e.key === 'M') Sound.toggleMute();
+  if (e.key === 'b' || e.key === 'B') Music.toggle();
 });
 window.addEventListener('keyup', (e) => {
   const k = KEYMAP[e.key];
   if (k) { keys[k] = false; e.preventDefault(); }
 });
 window.addEventListener('blur', () => { keys.left = keys.right = keys.up = keys.down = false; });
-window.addEventListener('pointerdown', () => Sound.unlock());
+window.addEventListener('pointerdown', (e) => { Sound.unlock(); handlePointer(e); });
 
 
 /* =====================================================================
@@ -604,6 +689,13 @@ window.addEventListener('pointerdown', () => Sound.unlock());
    ===================================================================== */
 const game = {
   time: 0,
+  mode: 'menu',          // 'menu', 'sky', 'seek', 'feed', 'grumpy', 'plane' or 'free'
+  menuIndex: 0,          // which picture card is picked on the menu
+  complete: null,        // set while the "you did it!" celebration shows
+  finishIn: 0,           // countdown to that celebration
+  fedCount: 0,           // happy meals so far in "Feed the Dragons"
+  petTarget: null,       // the creature Michael is next to (shows the pat bubble)
+  patAnim: null,         // the patting hand animation
   scene: 'world',        // 'world' or 'house'
   started: false,        // has Michael pressed an arrow yet? (hides the arrow-key hint)
   skyRGB: hexToRgb(C.sky),
@@ -625,7 +717,7 @@ const michael = {
   x: 720, y: 600, vx: 0, vy: 0,
   facing: 1, flipX: 1, walkPhase: 0, moveAmt: 0,
   carry: [],             // foods stacked on his head
-  hidden: false,         // true while he's in the airplane
+  hidden: true,          // true on the menu and while he's in the airplane
 };
 
 // Fixed places for the big things
@@ -949,6 +1041,150 @@ function drawParticles(c) {
    8. ACTIVITIES
    ===================================================================== */
 
+// ---------- Modes: the menu, the 5 activities and free play ----------
+// The menu cards, in order (3 on top, 3 below)
+const MENU_CARDS = ['sky', 'seek', 'feed', 'grumpy', 'plane', 'free'];
+// Is this activity switched on right now? (Free play switches everything on.)
+function activityOn(name) { return game.mode === name || game.mode === 'free'; }
+function usesFood() { return activityOn('feed') || activityOn('grumpy'); }
+
+function moveMenuSelection(dir) {
+  const i = game.menuIndex;
+  if (dir === 'left') game.menuIndex = i % 3 === 0 ? i + 2 : i - 1;
+  if (dir === 'right') game.menuIndex = i % 3 === 2 ? i - 2 : i + 1;
+  if (dir === 'up' || dir === 'down') game.menuIndex = (i + 3) % 6;
+  Sound.tick();
+}
+// The SPACE BAR (or Enter): pick on the menu, pat a creature, change the TV channel
+function pressAction() {
+  if (game.fade) return;
+  if (game.mode === 'menu') { startMode(MENU_CARDS[game.menuIndex]); return; }
+  if (game.complete) { if (game.complete.t > 1.5) goMenu(); return; }
+  if (game.scene === 'house') { changeChannel(); return; }
+  if (game.petTarget) petCreature(game.petTarget);
+}
+// Clicks and taps: menu cards, the home button, the pat bubble
+function handlePointer(e) {
+  const x = (e.clientX - view.offX) / view.scale, y = (e.clientY - view.offY) / view.scale;
+  if (game.fade) return;
+  if (game.mode === 'menu') {
+    MENU_CARDS.forEach((mode, i) => {
+      const r = menuCardRect(i);
+      if (x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h) { game.menuIndex = i; startMode(mode); }
+    });
+    return;
+  }
+  if (Math.hypot(x - HOME_BUTTON.x, y - HOME_BUTTON.y) < HOME_BUTTON.r + 6) { goMenu(); return; }
+  if (game.complete) { if (game.complete.t > 1.5) goMenu(); return; }
+  if (game.petTarget) {
+    const p = promptPos(game.petTarget);
+    if (Math.hypot(x - p.x, y - p.y) < 45) petCreature(game.petTarget);
+  }
+}
+
+function startMode(mode) {
+  if (game.fade) return;
+  Sound.magic(); Sound.chirp(1.2);
+  fadeTo(() => {
+    game.mode = mode;
+    game.started = false;
+    resetWorldForMode(mode);
+  });
+}
+function goMenu() {
+  if (game.fade || game.mode === 'menu') return;
+  Sound.chirp(0.9);
+  fadeTo(() => { game.mode = 'menu'; resetWorldForMode('menu'); });
+}
+// Puts everything back in place so each activity starts fresh
+function resetWorldForMode(mode) {
+  Sound.stopEngine(); Sound.stopTunes();
+  game.scene = 'world'; game.complete = null; game.finishIn = 0;
+  game.flight = null; game.parade = null; game.paradeDelay = 0; game.skyTarget = C.sky;
+  game.petTarget = null; game.patAnim = null; game.fedCount = 0;
+  Object.assign(plane, { x: plane.homeX, y: plane.homeY, alt: 0, facing: -1, tilt: 0, armed: true });
+  Object.assign(game.camera, { x: WORLD_W / 2, y: WORLD_H / 2, zoom: 1 });
+  Object.assign(michael, { x: 720, y: 600, vx: 0, vy: 0, carry: [], hidden: mode === 'menu', facing: 1, flipX: 1 });
+  flyingFoods.length = 0; foods.length = 0;
+  hideSkyButtons();
+  resetHideAndSeek();
+  resetGrumpy();
+  hungryDragons.forEach((d) => { d.state = 'waiting'; d.mouthOpen = 0; d.happyT = 0; newWish(d); });
+  if (usesFood()) for (let i = 0; i < CONFIG.NUMBER_OF_FOOD_ITEMS; i++) spawnFood(Math.random() < 0.6 ? pick(MENU[game.timeOfDay]) : pick(FOOD_TYPES));
+  particles.length = 0;
+}
+// "You did it!" - big star, cheering, then back to the menu
+function completeActivity() {
+  if (game.mode === 'menu' || game.mode === 'free') return;
+  game.complete = { t: 0 };
+  Sound.fanfare(); Sound.cheer();
+  for (let i = 0; i < 6; i++) confetti(rand(200, 1240), rand(100, 400), 25);
+}
+function updateFinishing(dt) {
+  if (game.finishIn > 0) {
+    game.finishIn -= dt;
+    if (game.finishIn <= 0) completeActivity();
+  }
+  if (game.complete) {
+    game.complete.t += dt;
+    if (Math.random() < dt * 12) addParticle({ type: 'confetti', x: rand(0, WORLD_W), y: -10, vx: rand(-30, 30), vy: rand(80, 150), g: 30, life: 5, size: 10, color: pick(RAINBOW) });
+    if (game.complete.t > 6) goMenu();
+  }
+}
+
+// ---------- Patting dragons and dinos (SPACE BAR) ----------
+// Each press does the next thing: 1) pat  2) a trick  3) a dance
+function pettableCreatures() {
+  const list = creatures.concat(hungryDragons, [grumpy]);
+  for (const d of seek.dinos) if (d.state === 'following') list.push(d);
+  return list;
+}
+function updatePetting(dt) {
+  if (game.patAnim) { game.patAnim.t += dt; if (game.patAnim.t > 1) game.patAnim = null; }
+  game.petTarget = null;
+  if (game.mode === 'menu' || game.complete || game.flight || michael.hidden || game.scene !== 'world') return;
+  let best = null, bestD = 1;
+  for (const c of pettableCreatures()) {
+    const dx = (michael.x - c.x) / (95 * c.size), dy = (michael.y - c.y) / (55 * c.size);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { best = c; bestD = d; }
+  }
+  game.petTarget = best;
+}
+function isBusy(c) { return c.petT > 0 || c.spinT > 0 || c.danceT > 0 || c.trickT > 0; }
+function petCreature(c) {
+  if (c === grumpy && grumpy.mood === 'grumpy') {
+    // the grumpy dragon doesn't want pats yet - "hmph!"
+    Sound.grumble();
+    c.facing = michael.x > c.x ? -1 : 1;
+    c.bubblePop = 1;
+    for (let i = 0; i < 5; i++) addParticle({ type: 'smoke', x: c.x, y: c.y - 95 * c.size, vx: rand(-30, 30), vy: rand(-50, -20), size: rand(5, 8), color: '#b8b2c4', life: 1.1 });
+    return;
+  }
+  if (c.state === 'eating' || c.state === 'catching' || c.state === 'transforming' || isBusy(c)) return;
+  c.petCount = (c.petCount || 0) + 1;
+  c.facing = michael.x > c.x ? 1 : -1;
+  const action = (c.petCount - 1) % 3;
+  if (action === 0) {        // pat: closes eyes happily, hearts
+    c.petT = 1.2;
+    game.patAnim = { c, t: 0 };
+    Sound.purr();
+    hearts(c.x, c.y - 80 * c.size, 7);
+  } else if (action === 1) { // trick: dragons breathe rainbow sparkles, dinos do a spin and a little "rawr"
+    if (c.kind === 'dragon') { c.trickT = 1.3; Sound.sparkleBreath(); }
+    else { c.spinT = 0.8; Sound.rawr(c.pitch); burst('sparkle', c.x, c.y - 40, 10, { colors: RAINBOW, speed: 150 }); }
+  } else {                   // dance with music notes
+    c.danceT = 2.2;
+    Sound.playTune(TUNES.dance, 260, 'triangle', 0.14);
+  }
+}
+function promptPos(cr) {
+  const hasBubble = (activityOn('feed') && hungryDragons.includes(cr) && (cr.state === 'waiting' || cr.state === 'catching')) ||
+                    (cr === grumpy && activityOn('grumpy') && (cr.state === 'grumpy' || cr.state === 'catching'));
+  if (hasBubble) { const side = michael.x < cr.x ? 1 : -1; return { x: cr.x + side * 85 * cr.size, y: cr.y - 70 * cr.size - cr.jump }; }
+  return { x: cr.x, y: cr.y - 118 * cr.size - cr.jump };
+}
+
 // ---------- Time of day: decides the dragons' menu ----------
 function currentTimeOfDay() {
   const mode = CONFIG.TIME_OF_DAY;
@@ -978,8 +1214,8 @@ function updateTimeOfDay(dt) {
 
 // ---------- Food: collecting and keeping enough around ----------
 function wantedFoods() {
-  const list = hungryDragons.filter((d) => d.state === 'waiting' && d.want).map((d) => d.want);
-  if (grumpy.state === 'grumpy' && grumpy.want) list.push(grumpy.want);
+  const list = activityOn('feed') ? hungryDragons.filter((d) => d.state === 'waiting' && d.want).map((d) => d.want) : [];
+  if (activityOn('grumpy') && grumpy.state === 'grumpy' && grumpy.want) list.push(grumpy.want);
   return list;
 }
 function updateFoods(dt) {
@@ -1055,6 +1291,7 @@ function updateHungryDragons(dt) {
     d.bubblePop = Math.max(0, d.bubblePop - dt * 2);
     d.walkPhase += dt;
     const near = !michael.hidden && touching(d.x, d.y, 95, 60);
+    if (!activityOn('feed')) { updateHop(d, dt); continue; }
     if (d.state === 'waiting') {
       // look toward Michael when he's close
       if (Math.abs(michael.x - d.x) < 250 && Math.abs(michael.y - d.y) < 150) d.facing = michael.x > d.x ? 1 : -1;
@@ -1071,6 +1308,8 @@ function updateHungryDragons(dt) {
       if (d.stateT <= 0) {
         d.state = 'happy'; d.stateT = 2.6; d.happyT = 1.4; d.mouthOpen = 1;
         Sound.cheer(); Sound.chirp(d.pitch);
+        game.fedCount++;
+        if (game.mode === 'feed' && game.fedCount >= CONFIG.FEEDS_TO_FINISH) game.finishIn = 2.8;
         hearts(d.x, d.y - 80 * d.size, 8);
         confetti(d.x, d.y - 60, 24);
       }
@@ -1112,7 +1351,9 @@ function updateGrumpy(dt) {
       for (let i = 0; i < 3; i++) addParticle({ type: 'smoke', x: nose.x, y: nose.y, vx: g.facing * rand(20, 50), vy: rand(-45, -25), size: rand(4, 7), color: '#a9a3b5', life: 1.2 });
       if (near) Sound.puff();
     }
-    if (near && michael.carry.includes(g.want)) {
+    if (!activityOn('grumpy')) {
+      // just stomping around today
+    } else if (near && michael.carry.includes(g.want)) {
       g.facing = michael.x > g.x ? 1 : -1;
       const m = mouthPos(g);
       giveFood(g.want, m.x, m.y, () => { g.state = 'eating'; g.stateT = 1.2; Sound.chomp(); });
@@ -1139,13 +1380,15 @@ function updateGrumpy(dt) {
       g.state = 'happy'; g.mood = 'happy'; g.moodMix = 1; g.happyT = 1.4; g.happyTime = 0; g.speed = 45; g.mouthOpen = 0;
       Sound.cheer(); Sound.playTune(TUNES.happyDragon, 260, 'triangle', 0.14, 1, 0.3);
       hearts(g.x, g.y - 120, 12); confetti(g.x, g.y - 100, 40);
+      if (game.mode === 'grumpy') game.finishIn = 3;
     }
   } else if (g.state === 'happy') {
-    if (g.happyT <= 0) wander(g, dt, WANDER_AREA);
+    if (g.happyT <= 0 && !isBusy(g)) wander(g, dt, WANDER_AREA);
+    else g.moving = false;
     g.mouthOpen = g.happyT > 0 ? 1 : 0;
     if (arrived(g, near)) { g.happyT = 1.4; Sound.chirp(0.8); hearts(g.x, g.y - 110, 6); }
     g.happyTime += dt;
-    if (CONFIG.GRUMPY_GETS_GRUMPY_AGAIN_AFTER > 0 && g.happyTime > CONFIG.GRUMPY_GETS_GRUMPY_AGAIN_AFTER && !near) {
+    if (game.mode === 'free' && CONFIG.GRUMPY_GETS_GRUMPY_AGAIN_AFTER > 0 && g.happyTime > CONFIG.GRUMPY_GETS_GRUMPY_AGAIN_AFTER && !near) {
       // a little grey cloud comes back...
       g.state = 'grumpy'; g.mood = 'grumpy'; g.moodMix = 0; g.speed = 28; g.want = pick(MENU[game.timeOfDay]); g.bubblePop = 1;
       for (let i = 0; i < 10; i++) addParticle({ type: 'smoke', x: g.x + rand(-40, 40), y: g.y - rand(60, 140), vx: rand(-20, 20), vy: rand(-30, 0), size: 8, color: '#b8b2c4', life: 1.2 });
@@ -1156,8 +1399,16 @@ function updateGrumpy(dt) {
   updateHop(g, dt);
 }
 
+function resetGrumpy() {
+  Object.assign(grumpy, {
+    state: 'grumpy', mood: 'grumpy', moodMix: 0, speed: 28, want: pick(MENU[game.timeOfDay]), bubblePop: 0,
+    happyTime: 0, mouthOpen: 0, happyT: 0, x: 1180, y: 700, tx: 1180, ty: 700, idle: 1, armed: true,
+  });
+}
+
 // ---------- Sky Color Hunt ----------
 function updateSkyButtons(dt) {
+  if (!activityOn('sky')) return;
   for (const b of skyButtons) {
     b.press = Math.max(0, b.press - dt * 2.5);
     if (b.found) b.mound = Math.max(0, b.mound - dt * 3);
@@ -1212,12 +1463,22 @@ function updateParade(dt) {
   if (p.t >= CONFIG.PARADE_SECONDS) {
     game.parade = null;
     game.skyTarget = C.sky;
-    hideSkyButtons(); // ready to be found again
+    if (game.mode === 'sky') game.finishIn = 0.6;
+    else hideSkyButtons(); // free play: ready to be found again
   }
 }
 
 // ---------- Hide and Seek ----------
+function resetHideAndSeek() {
+  const order = shuffle(trees.map((_, i) => i));
+  seek.dinos.forEach((d, i) => Object.assign(d, {
+    state: 'hidden', tree: order[i], side: Math.random() < 0.5 ? -1 : 1, found: false, armed: true,
+    x: trees[order[i]].x, y: trees[order[i]].y - 2, jump: 0, happyT: 0, moving: false,
+  }));
+  seek.celebrate = 0;
+}
 function updateHideAndSeek(dt) {
+  if (!activityOn('seek')) return;
   let followIndex = 0;
   for (const d of seek.dinos) {
     const tree = trees[d.tree];
@@ -1235,7 +1496,11 @@ function updateHideAndSeek(dt) {
         confetti(tree.x, tree.y - 100, 30);
         burst('sparkle', tree.x, tree.y - 110, 12, { color: '#ffd23f', speed: 200 });
         const foundCount = seek.dinos.filter((x) => x.found).length;
-        if (foundCount === seek.dinos.length) { seek.celebrate = 4.5; setTimeout(() => Sound.fanfare(), 600); }
+        if (foundCount === seek.dinos.length) {
+          seek.celebrate = 4.5;
+          if (game.mode === 'seek') game.finishIn = 3;
+          else setTimeout(() => Sound.fanfare(), 600);
+        }
       }
     } else if (d.state === 'popping') {
       d.popT += dt / 0.6;
@@ -1275,7 +1540,7 @@ function updateHideAndSeek(dt) {
   if (seek.celebrate > 0) {
     seek.celebrate -= dt;
     if (Math.random() < dt * 8) confetti(michael.x + rand(-100, 100), michael.y - 160, 3);
-    if (seek.celebrate <= 0) {
+    if (seek.celebrate <= 0 && game.mode === 'free') {
       const nearestTree = trees.indexOf(trees.slice().sort((a, b) => Math.hypot(a.x - michael.x, a.y - michael.y) - Math.hypot(b.x - michael.x, b.y - michael.y))[0]);
       const freeTrees = shuffle(trees.map((_, i) => i).filter((i) => i !== nearestTree));
       seek.dinos.forEach((d, i) => {
@@ -1355,6 +1620,7 @@ function updateFlight(dt) {
       michael.x = plane.homeX - 170; michael.y = plane.homeY + 75;
       plane.armed = false;
       hearts(michael.x, michael.y - 150, 6);
+      if (game.mode === 'plane') game.finishIn = 1.5;
       return;
     }
   }
@@ -1413,15 +1679,16 @@ function leaveHouse() {
     particles.length = 0;
   });
 }
+function changeChannel() {
+  tv.channel = (tv.channel + 1) % TV_CHANNELS;
+  tv.channelT = 0; tv.staticT = 0.35;
+  Sound.click(); Sound.playTune(TUNES.tv, 240, 'triangle', 0.12, 1, 0.3);
+}
 function updateHouseScene(dt) {
   tv.channelT += dt;
   tv.staticT = Math.max(0, tv.staticT - dt);
   const nearTV = michael.y < 560 && Math.abs(michael.x - 720) < 240;
-  if (arrived(tv, nearTV) || tv.channelT > 12) { // walk up to the TV to change the channel
-    tv.channel = (tv.channel + 1) % TV_CHANNELS;
-    tv.channelT = 0; tv.staticT = 0.35;
-    Sound.click(); Sound.playTune(TUNES.tv, 240, 'triangle', 0.12, 1, 0.3);
-  }
+  if (arrived(tv, nearTV) || tv.channelT > 12) changeChannel(); // walk up to the TV (or press SPACE) to change the channel
   // walk onto the doormat at the bottom to go back outside
   const onMat = michael.y > 770 && Math.abs(michael.x - 720) < 120;
   if (arrived(doormat, onMat) && !game.fade) leaveHouse();
@@ -1487,20 +1754,36 @@ function inGrumpyCorner(x, y) {
   return x > GRUMPY_AREA.x1 - 80 && x < GRUMPY_AREA.x2 + 80 && y > GRUMPY_AREA.y1 - 60 && y < GRUMPY_AREA.y2 + 60;
 }
 // Happy hops (two bounces)
+// (also runs the pat / trick / dance animations)
 function updateHop(c, dt) {
   c.lookUp = Math.max(0, (c.lookUp || 0) - dt);
+  c.petT = Math.max(0, (c.petT || 0) - dt);
+  c.spinT = Math.max(0, (c.spinT || 0) - dt);
+  let jump = 0;
   if (c.happyT > 0) {
     c.happyT = Math.max(0, c.happyT - dt);
-    c.jump = Math.abs(Math.sin((c.happyT / 0.7) * Math.PI)) * 24;
-    if (c.happyT === 0) c.jump = 0;
-  } else if (!(c.state === 'popping')) {
-    c.jump = 0;
+    jump = Math.abs(Math.sin((c.happyT / 0.7) * Math.PI)) * 24;
   }
+  if (c.spinT > 0) jump = Math.max(jump, Math.sin((1 - c.spinT / 0.8) * Math.PI) * 30);
+  if (c.danceT > 0) {
+    c.danceT = Math.max(0, c.danceT - dt);
+    jump = Math.max(jump, Math.abs(Math.sin(c.danceT * 9)) * 14);
+    c.facing = Math.sin(c.danceT * 6) > 0 ? 1 : -1;
+    if (Math.random() < dt * 4) addParticle({ type: 'note', x: c.x + rand(-30, 30), y: c.y - 90 * c.size, vx: rand(-20, 20), vy: -50, life: 1.4, color: pick(RAINBOW) });
+  }
+  if (c.trickT > 0) { // rainbow sparkle breath
+    c.trickT = Math.max(0, c.trickT - dt);
+    if (Math.random() < dt * 45) {
+      const m = mouthPos(c);
+      addParticle({ type: 'sparkle', x: m.x, y: m.y, vx: c.facing * rand(120, 240), vy: rand(-70, 10), size: rand(6, 11), color: pick(RAINBOW), life: 0.9, g: 40 });
+    }
+  }
+  if (c.state !== 'popping') c.jump = jump;
 }
 
 function updateCreatures(dt) {
   for (const c of creatures) {
-    if (c.happyT <= 0) wander(c, dt, WANDER_AREA);
+    if (c.happyT <= 0 && !isBusy(c)) wander(c, dt, WANDER_AREA);
     else c.moving = false;
     if (arrived(c, !michael.hidden && touching(c.x, c.y, 45 * c.size, 26 * c.size))) {
       c.happyT = 1.4;
@@ -1540,23 +1823,25 @@ function updateRockets(dt) {
 }
 
 function updateWorldScene(dt) {
-  if (!game.flight) updateMichael(dt, { x1: 0, x2: WORLD_W, y1: GROUND_TOP, y2: WORLD_H - 6, halfWidth: michaelHalfWidth(1) });
+  const playing = game.mode !== 'menu' && !game.complete;
+  if (playing && !game.flight) updateMichael(dt, { x1: 0, x2: WORLD_W, y1: GROUND_TOP, y2: WORLD_H - 6, halfWidth: michaelHalfWidth(1) });
   updateCreatures(dt);
   updatePeople(dt);
   updateRockets(dt);
   updateSkyButtons(dt);
-  updateFoods(dt);
+  if (usesFood()) updateFoods(dt);
   updateHungryDragons(dt);
   updateGrumpy(dt);
   updateHideAndSeek(dt);
   updateParade(dt);
   updateFlight(dt);
   updateCamera(dt);
+  updatePetting(dt);
 
-  // walk to the house door to go inside
-  if (!game.flight && !game.fade && arrived(house, touching(house.x, house.y + 6, 42, 26))) enterHouse();
+  // walk to the house door to go inside (free play)
+  if (playing && game.mode === 'free' && !game.flight && !game.fade && arrived(house, touching(house.x, house.y + 6, 42, 26))) enterHouse();
   // walk to the airplane to hop on
-  if (!game.flight && !game.fade && arrived(plane, touching(plane.homeX, plane.homeY, 115, 45))) startFlight();
+  if (playing && activityOn('plane') && !game.flight && !game.fade && arrived(plane, touching(plane.homeX, plane.homeY, 115, 45))) startFlight();
   // chimney smoke
   if (Math.random() < dt * 2) addParticle({ type: 'smoke', x: house.x + 71, y: house.y - 255, vx: rand(5, 20), vy: -30, size: 7, color: '#f3eefc', life: 2.2 });
 }
@@ -1583,11 +1868,15 @@ function update(dt) {
   updateSky(dt);
   if (game.scene === 'world') updateWorldScene(dt);
   else {
-    updateMichael(dt, { x1: 0, x2: WORLD_W, y1: 520, y2: WORLD_H - 4, halfWidth: michaelHalfWidth(CONFIG.HOUSE_CHARACTER_SCALE), speedScale: 1.2 });
+    if (!game.fade) updateMichael(dt, { x1: 0, x2: WORLD_W, y1: 520, y2: WORLD_H - 4, halfWidth: michaelHalfWidth(CONFIG.HOUSE_CHARACTER_SCALE), speedScale: 1.2 });
     updateHouseScene(dt);
   }
+  updateFinishing(dt);
   updateParticles(dt);
   updateFade(dt);
+  // background music: starts after the first key press, quieter while songs play
+  Music.start();
+  Music.setLevel(game.parade || game.complete || game.scene === 'house' ? 0.3 : 1);
   game.shake = Math.max(0, game.shake - dt * 12);
   for (const k of ['skyPop', 'starPop', 'timePop']) game.hud[k] = Math.max(0, game.hud[k] - dt * 2.5);
 }
@@ -1712,7 +2001,9 @@ function drawCreature(c, d, colorsOverride) {
   let stomp = 0;
   if (d.stompAnim > 0) stomp = Math.sin((1 - d.stompAnim / 0.35) * Math.PI) * 10;
   c.translate(0, -d.jump - stomp);
+  if (d.danceT > 0) c.rotate(Math.sin(d.danceT * 10) * 0.12);
   c.scale(d.facing * d.size, d.size);
+  if (d.spinT > 0) c.scale(Math.cos((1 - d.spinT / 0.8) * TAU), 1); // a little twirl
   const step = d.moving ? Math.sin(d.walkPhase) : 0;
   const bob = d.moving ? Math.abs(Math.cos(d.walkPhase)) * 2 : Math.sin(t * 2 + d.seed) * 0.8;
   c.lineWidth = 2.5; c.lineJoin = 'round'; c.lineCap = 'round';
@@ -1786,14 +2077,20 @@ function drawCreature(c, d, colorsOverride) {
   // face
   const look = d.lookUp > 0 ? -2.5 : 0;
   const blink = (Math.sin(t * 0.9 + d.seed * 3) > 0.985) ? 0.15 : 1;
-  for (const ex of [19, 31]) {
-    c.save();
-    c.translate(ex, -55 - bob);
-    c.scale(1, blink);
-    circle(c, 0, 0, 6.5, '#ffffff');
-    circle(c, 1.6, 0.5 + look, 4, '#2b1d3a');
-    circle(c, 2.8, -1.2 + look, 1.5, '#ffffff');
-    c.restore();
+  if (d.petT > 0 && !grumpyFace) {
+    // eyes closed happily while being patted  ^ ^
+    c.strokeStyle = '#2b1d3a'; c.lineWidth = 2.5;
+    for (const ex of [19, 31]) { c.beginPath(); c.arc(ex, -53 - bob, 5, 1.15 * Math.PI, 1.85 * Math.PI); c.stroke(); }
+  } else {
+    for (const ex of [19, 31]) {
+      c.save();
+      c.translate(ex, -55 - bob);
+      c.scale(1, blink);
+      circle(c, 0, 0, 6.5, '#ffffff');
+      circle(c, 1.6, 0.5 + look, 4, '#2b1d3a');
+      circle(c, 2.8, -1.2 + look, 1.5, '#ffffff');
+      c.restore();
+    }
   }
   if (grumpyFace) {
     // heavy eyelids + cross eyebrows
@@ -1807,10 +2104,11 @@ function drawCreature(c, d, colorsOverride) {
   }
   circle(c, 45, -51 - bob, 1.4, line); circle(c, 41, -52 - bob, 1.4, line); // nostrils
   c.strokeStyle = '#3d2f4d'; c.lineWidth = 2.2;
-  if (d.mouthOpen > 0.5) {
+  const mouth = Math.max(d.mouthOpen || 0, d.trickT > 0 || d.danceT > 0 || d.spinT > 0 ? 1 : 0);
+  if (mouth > 0.5) {
     c.fillStyle = '#9b2c4a';
-    c.beginPath(); c.ellipse(38, -42 - bob, 6, 4 * d.mouthOpen + 1, 0, 0, Math.PI); c.closePath(); c.fill();
-    ellipse(c, 38, -40 - bob + 2 * d.mouthOpen, 3, 1.6, '#ff8fa8');
+    c.beginPath(); c.ellipse(38, -42 - bob, 6, 4 * mouth + 1, 0, 0, Math.PI); c.closePath(); c.fill();
+    ellipse(c, 38, -40 - bob + 2 * mouth, 3, 1.6, '#ff8fa8');
   } else if (grumpyFace) {
     c.beginPath(); c.arc(37, -38 - bob, 5, 1.15 * Math.PI, 1.85 * Math.PI); c.stroke();
   } else {
@@ -2199,19 +2497,19 @@ function drawWorld(c) {
   c.drawImage(backgroundLayer, 0, 0, WORLD_W, WORLD_H);
 
   // things lying flat on the ground
-  for (const b of skyButtons) drawSkyButton(c, b);
+  if (activityOn('sky')) for (const b of skyButtons) drawSkyButton(c, b);
 
   // everything that stands up is drawn back-to-front (higher on screen = further away)
   const list = [];
   for (const tree of trees) list.push({ y: tree.y, draw: () => {
-    const hider = seek.dinos.find((d) => d.state === 'hidden' && d.tree === trees.indexOf(tree));
+    const hider = activityOn('seek') && seek.dinos.find((d) => d.state === 'hidden' && d.tree === trees.indexOf(tree));
     if (hider) drawHidingDino(c, hider, tree);
     drawTree(c, tree);
   } });
   for (const r of rockets) list.push({ y: r.y, draw: () => drawRocket(c, r) });
   for (const cr of creatures) list.push({ y: cr.y, draw: () => drawCreature(c, cr) });
   for (const d of hungryDragons) list.push({ y: d.y, draw: () => drawCreature(c, d) });
-  for (const d of seek.dinos) if (d.state !== 'hidden') list.push({ y: d.y, draw: () => drawCreature(c, d) });
+  if (activityOn('seek')) for (const d of seek.dinos) if (d.state !== 'hidden') list.push({ y: d.y, draw: () => drawCreature(c, d) });
   list.push({ y: grumpy.y, draw: () => drawCreature(c, grumpy, grumpyColors()) });
   for (const p of people) list.push({ y: p.y, draw: () => drawPerson(c, p) });
   for (const f of foods) list.push({ y: f.y, draw: () => {
@@ -2222,7 +2520,7 @@ function drawWorld(c) {
   list.push({ y: house.y, draw: () => drawHouse(c) });
   if (plane.alt < 1) list.push({ y: plane.y, draw: () => drawAirplane(c, plane.x, plane.y, { facing: plane.facing, withMichael: game.flight && game.flight.phase === 'flying' }) });
   if (game.parade) for (const d of game.parade.dragons) list.push({ y: d.y, draw: () => drawParadeDragon(c, d) });
-  if (!game.flight) list.push({ y: michael.y, draw: () => {
+  if (!game.flight && !michael.hidden) list.push({ y: michael.y, draw: () => {
     drawMichael(c, michael.x, michael.y, CONFIG.CHARACTER_HEIGHT);
     drawCarriedFood(c, michael.x, michael.y, CONFIG.CHARACTER_HEIGHT, michael.carry);
   } });
@@ -2230,8 +2528,8 @@ function drawWorld(c) {
   for (const item of list) item.draw();
 
   // food wish bubbles always on top
-  for (const d of hungryDragons) if (d.state === 'waiting' || d.state === 'catching') drawFoodBubble(c, d.x + d.facing * 10, d.y - 135, d.want, d.bubblePop);
-  if (grumpy.state === 'grumpy' || grumpy.state === 'catching') drawFoodBubble(c, grumpy.x + 20, grumpy.y - 175, grumpy.want, grumpy.bubblePop);
+  if (activityOn('feed')) for (const d of hungryDragons) if (d.state === 'waiting' || d.state === 'catching') drawFoodBubble(c, d.x + d.facing * 10, d.y - 135, d.want, d.bubblePop);
+  if (activityOn('grumpy') && (grumpy.state === 'grumpy' || grumpy.state === 'catching')) drawFoodBubble(c, grumpy.x + 20, grumpy.y - 175, grumpy.want, grumpy.bubblePop);
 
   // flying food
   for (const f of flyingFoods) {
@@ -2241,6 +2539,9 @@ function drawWorld(c) {
 
   drawFlightLayer(c);
   drawParticles(c);
+  drawPatHand(c);
+  drawPetPrompt(c);
+  drawGuideArrow(c);
   c.restore();
 
   // night: a soft purple dusk over everything
@@ -2288,6 +2589,204 @@ function drawFlightLayer(c) {
     const h = f.phase === 'boarding' ? lerp(CONFIG.CHARACTER_HEIGHT, 74, k) : lerp(74, CONFIG.CHARACTER_HEIGHT, k);
     drawMichael(c, lerp(a.x, b.x, k), lerp(a.y, b.y, k) - Math.sin(k * Math.PI) * 90, h, { bounce: 0, tilt: Math.sin(k * Math.PI) * 0.3, noShadow: true });
   }
+}
+
+// ---------- Pat bubble, patting hand, guide arrow ----------
+function drawHand(c, x, y, s, rot) {
+  const skin = '#f6c3a0', line = '#c98b6a';
+  c.save(); c.translate(x, y); c.rotate(rot || 0); c.scale(s, s);
+  for (let i = 0; i < 4; i++) roundRect(c, -15 + i * 8, -27 + (i === 0 || i === 3 ? 4 : 0), 7, 20, 3.5, skin, line, 2);
+  c.save(); c.translate(-16, -2); c.rotate(-0.8); roundRect(c, -3.5, -13, 7, 16, 3.5, skin, line, 2); c.restore();
+  roundRect(c, -16, -12, 31, 22, 9, skin, line, 2);
+  c.restore();
+}
+function drawSpaceKey(c, x, y, s) {
+  roundRect(c, x - 30 * s, y - 9 * s, 60 * s, 18 * s, 6 * s, '#ffffff', '#3a86ff', 3);
+  c.fillStyle = '#3a86ff'; c.fillRect(x - 14 * s, y + 1 * s, 28 * s, 3 * s);
+}
+function drawDownArrow(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  c.beginPath(); c.moveTo(-14, -34); c.lineTo(14, -34); c.lineTo(14, -10); c.lineTo(30, -10); c.lineTo(0, 22); c.lineTo(-30, -10); c.lineTo(-14, -10); c.closePath();
+  c.fillStyle = '#ffd23f'; c.fill(); c.strokeStyle = '#ffffff'; c.lineWidth = 4; c.lineJoin = 'round'; c.stroke();
+  c.restore();
+}
+// The bubble that pops up over the dragon or dino Michael is next to: "press SPACE to pat"
+function drawPetPrompt(c) {
+  const cr = game.petTarget;
+  if (!cr) return;
+  const p = promptPos(cr), s = 1 + Math.sin(game.time * 6) * 0.05;
+  c.save(); c.translate(p.x, p.y + Math.sin(game.time * 4) * 4); c.scale(s, s);
+  circle(c, 0, 0, 28, '#ffffff');
+  c.strokeStyle = '#ffd23f'; c.lineWidth = 5; c.beginPath(); c.arc(0, 0, 28, 0, TAU); c.stroke();
+  drawHand(c, 0, 9, 0.8, Math.sin(game.time * 8) * 0.15);
+  drawSpaceKey(c, 0, 44, 0.9);
+  c.restore();
+}
+function drawPatHand(c) {
+  const p = game.patAnim;
+  if (!p) return;
+  const cr = p.c, bob = Math.abs(Math.sin(p.t * 3 * Math.PI)) * 14;
+  c.save();
+  c.globalAlpha = p.t < 0.85 ? 1 : (1 - p.t) / 0.15;
+  drawHand(c, cr.x + cr.facing * 22 * cr.size, cr.y - cr.jump - 82 * cr.size - 10 - bob, 1, Math.PI * 0.95);
+  c.restore();
+}
+// A bouncing arrow that shows where to go next (only when it helps)
+function drawGuideArrow(c) {
+  if (game.flight || game.complete || game.mode === 'menu') return;
+  let target = null;
+  if (game.mode === 'plane') target = { x: plane.homeX - 20, y: plane.homeY - 135 };
+  if (activityOn('feed')) for (const d of hungryDragons) if (d.state === 'waiting' && michael.carry.includes(d.want)) target = { x: d.x + d.facing * 10, y: d.y - 200 };
+  if (activityOn('grumpy') && grumpy.state === 'grumpy' && michael.carry.includes(grumpy.want)) target = { x: grumpy.x + 20, y: grumpy.y - 240 };
+  if (target) drawDownArrow(c, target.x, target.y - Math.abs(Math.sin(game.time * 4)) * 14, 1);
+}
+
+// ---------- The menu: 6 big picture cards (no reading needed) ----------
+function menuCardRect(i) {
+  const w = 340, h = 240, col = i % 3, row = Math.floor(i / 3);
+  return { x: 170 + col * (w + 40), y: 225 + row * (h + 45), w, h };
+}
+// little creatures that live on the cards
+const cardCritters = {
+  seek: Object.assign(makeCreature('dino', C.dinos[1], 0, 0, 1.3), { facing: -1 }),
+  feed: Object.assign(makeCreature('dragon', C.dragons[5], 0, 0, 1.25), { facing: 1 }),
+  grumpy: Object.assign(makeCreature('dragon', C.grumpyDragon, 0, 0, 1.0), { facing: 1, mood: 'grumpy' }),
+  happy: Object.assign(makeCreature('dragon', C.happyDragon, 0, 0, 1.0), { facing: -1, mouthOpen: 1 }),
+  free: Object.assign(makeCreature('dino', C.dinos[2], 0, 0, 0.9), { facing: -1 }),
+};
+function drawMenu(c) {
+  const t = game.time;
+  c.fillStyle = 'rgba(29, 47, 107, 0.45)';
+  c.fillRect(0, 0, WORLD_W, WORLD_H);
+  // Michael flying his airplane across the top
+  const facing = Math.cos(t * 0.45) >= 0 ? 1 : -1;
+  c.save();
+  c.translate(720 + Math.sin(t * 0.45) * 430, 160 + Math.sin(t * 1.7) * 8);
+  c.scale(0.85, 0.85);
+  drawAirplane(c, 0, 0, { facing, tilt: Math.sin(t * 1.7) * 0.06, withMichael: true, flying: true });
+  c.restore();
+  MENU_CARDS.forEach((mode, i) => drawMenuCard(c, i, mode, i === game.menuIndex));
+}
+function drawMenuCard(c, i, mode, selected) {
+  const r = menuCardRect(i), t = game.time;
+  const pop = selected ? 1.06 + Math.sin(t * 4) * 0.015 : 1;
+  c.save();
+  c.translate(r.x + r.w / 2, r.y + r.h / 2);
+  c.scale(pop, pop);
+  roundRect(c, -r.w / 2 + 6, -r.h / 2 + 10, r.w, r.h, 30, 'rgba(10, 20, 60, 0.35)');
+  c.save();
+  roundRectPath(c, -r.w / 2, -r.h / 2, r.w, r.h, 30); c.clip();
+  drawCardScene(c, mode, r.w, r.h);
+  if (!selected) { c.fillStyle = 'rgba(29, 47, 107, 0.2)'; c.fillRect(-r.w / 2, -r.h / 2, r.w, r.h); }
+  c.restore();
+  roundRect(c, -r.w / 2, -r.h / 2, r.w, r.h, 30, null, selected ? '#ffd23f' : '#ffffff', selected ? 10 : 5);
+  c.restore();
+  if (selected) {
+    drawDownArrow(c, r.x + r.w / 2, r.y - 30 - Math.abs(Math.sin(t * 4)) * 10, 0.9);
+    drawSpaceKey(c, r.x + r.w / 2, r.y + r.h + 26, 1.4);
+  }
+}
+function drawCardScene(c, mode, w, h) {
+  const t = game.time, bottom = h / 2;
+  const scene = (skyColor) => {
+    const g = c.createLinearGradient(0, -h / 2, 0, h / 2);
+    g.addColorStop(0, mixColor(skyColor, '#000000', 0.08)); g.addColorStop(1, mixColor(skyColor, '#ffffff', 0.3));
+    c.fillStyle = g; c.fillRect(-w / 2, -h / 2, w, h);
+    c.fillStyle = C.grassTop; c.fillRect(-w / 2, bottom - 70, w, 70);
+    ellipse(c, -95, bottom - 45, 55, 10, C.snow); ellipse(c, 105, bottom - 18, 45, 8, C.snow);
+  };
+  const snow = () => { for (let i = 0; i < 14; i++) circle(c, ((i * 53 + t * 12) % w) - w / 2, ((i * 37 + t * 35) % h) - h / 2, 2.2, '#ffffff'); };
+  const critter = (d, x, y, colors) => { d.x = x; d.y = y; d.walkPhase = t * 8; drawCreature(c, d, colors); };
+
+  if (mode === 'sky') {            // Sky Color Hunt: the sky keeps changing color
+    const list = CONFIG.SKY_BUTTONS, k = (t / 1.3) % list.length, i = Math.floor(k);
+    scene(mixColor(list[i], list[(i + 1) % list.length], smooth(k - i)));
+    c.lineWidth = 9;
+    RAINBOW.slice(0, 6).forEach((col, j) => { c.strokeStyle = col; c.beginPath(); c.arc(0, 40, 125 - j * 9, Math.PI, TAU); c.stroke(); });
+    list.forEach((color, j) => drawSkyButton(c, { x: -120 + j * 60, y: bottom - 30, color, press: j === i ? 0.6 : 0, mound: 0, found: true, tw: j }));
+  } else if (mode === 'seek') {    // Hide and Seek: a dino peeks out from behind a tree
+    scene(C.sky);
+    c.save(); c.translate(-20, bottom - 25); c.scale(0.62, 0.62);
+    critter(cardCritters.seek, 70 + Math.max(0, Math.sin(t * 1.6)) * 55, 0);
+    drawTree(c, { x: 0, y: 0, seed: 0, shake: 0 });
+    c.restore();
+    for (let j = 0; j < 3; j++) {
+      c.save(); c.translate(-125 + j * 40, -h / 2 + 32); c.rotate(Math.sin(t * 3 + j) * 0.15);
+      starPath(c, 0, 0, 16, 7, 5); c.fillStyle = '#ffd23f'; c.fill(); c.strokeStyle = '#e09b00'; c.lineWidth = 2.5; c.stroke();
+      c.restore();
+    }
+  } else if (mode === 'feed') {    // Feed the Dragons: a dragon wishing for food
+    scene(C.sky);
+    ellipse(c, -20, bottom - 30, 115, 24, '#ff5d6c');
+    for (let j = 0; j < 6; j++) circle(c, -95 + j * 30, bottom - 30 + (j % 2 ? 8 : -8), 5, '#ffffff');
+    cardCritters.feed.mouthOpen = Math.sin(t * 3) > 0 ? 1 : 0;
+    critter(cardCritters.feed, -45, bottom - 32);
+    drawFoodBubble(c, 85, -40, FOOD_TYPES[Math.floor(t / 1.5) % 4], 0);
+  } else if (mode === 'grumpy') {  // Cheer Up the Grumpy Dragon: grumpy -> happy
+    scene(C.sky);
+    critter(cardCritters.grumpy, -95, bottom - 30, C.grumpyDragon);
+    for (let j = 0; j < 3; j++) {
+      const k = (t * 0.6 + j / 3) % 1;
+      c.globalAlpha = 1 - k; circle(c, -52 + k * 20, -10 - k * 60, 6 + k * 8, '#b8b2c4'); c.globalAlpha = 1;
+    }
+    c.save(); c.translate(0, -5 + Math.sin(t * 3) * 3);
+    c.beginPath(); c.moveTo(-26, -8); c.lineTo(6, -8); c.lineTo(6, -22); c.lineTo(30, 0); c.lineTo(6, 22); c.lineTo(6, 8); c.lineTo(-26, 8); c.closePath();
+    c.fillStyle = '#ffd23f'; c.fill(); c.strokeStyle = '#ffffff'; c.lineWidth = 4; c.stroke();
+    c.restore();
+    cardCritters.happy.jump = Math.abs(Math.sin(t * 4)) * 10;
+    critter(cardCritters.happy, 100, bottom - 30, C.happyDragon);
+    c.save(); c.translate(100, -75 - Math.abs(Math.sin(t * 2)) * 10); c.fillStyle = '#ff4d8d'; heartPath(c, 26); c.fill(); c.restore();
+  } else if (mode === 'plane') {   // Airplane Ride
+    scene(C.sky);
+    for (let j = 0; j < 3; j++) drawCloud(c, (((j * 150 - t * 60) % (w + 200)) + w + 200) % (w + 200) - w / 2 - 100, -70 + j * 40, 0.55, 1);
+    for (let j = 0; j < 4; j++) {
+      const tx = (((j * 110 - t * 90) % (w + 60)) + w + 60) % (w + 60) - w / 2 - 30;
+      c.fillStyle = C.treeTrunk; c.fillRect(tx - 3, bottom - 50, 6, 18);
+      circle(c, tx, bottom - 58, 15, C.treeLeaves);
+    }
+    c.save(); c.translate(0, 10 + Math.sin(t * 2) * 10); c.scale(0.72, 0.72);
+    drawAirplane(c, 0, 50, { facing: 1, tilt: Math.sin(t * 2) * 0.08, withMichael: true, flying: true });
+    c.restore();
+    snow();
+  } else {                         // Free play: Michael strolling around town
+    scene(C.sky);
+    c.save(); c.translate(-118, bottom - 22); c.scale(0.55, 0.55);
+    drawRocket(c, { x: 0, y: 0, h: 210, colors: C.rockets[0], wobT: 99 });
+    c.restore();
+    cardCritters.free.moving = true;
+    critter(cardCritters.free, 112, bottom - 24);
+    const flip = Math.cos(t * 0.8) >= 0 ? 1 : -1;
+    drawMichael(c, Math.sin(t * 0.8) * 45, bottom - 18, 165, { bounce: Math.abs(Math.sin(t * 9)) * 6, tilt: Math.sin(t * 9) * 0.06, flip });
+    snow();
+  }
+}
+
+// ---------- "You did it!" ----------
+function drawComplete(c) {
+  const t = game.complete.t, k = smooth(Math.min(1, t / 0.6));
+  c.fillStyle = `rgba(255, 240, 200, ${0.35 * k})`;
+  c.fillRect(0, 0, WORLD_W, WORLD_H);
+  // sun rays
+  c.save(); c.translate(860, 390); c.rotate(t * 0.4); c.globalAlpha = 0.5 * k;
+  for (let i = 0; i < 16; i++) {
+    c.fillStyle = i % 2 ? '#fff27a' : '#ffffff';
+    c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 1000, (i * TAU) / 16, ((i + 1) * TAU) / 16); c.closePath(); c.fill();
+  }
+  c.restore();
+  // a big smiling star
+  c.save(); c.translate(860, 380);
+  const s = k * (1 + Math.sin(t * 4) * 0.04);
+  c.scale(Math.max(0.01, s), Math.max(0.01, s)); c.rotate(Math.sin(t * 2) * 0.06);
+  starPath(c, 0, 0, 175, 85, 5);
+  c.fillStyle = '#ffd23f'; c.fill(); c.strokeStyle = '#e09b00'; c.lineWidth = 10; c.lineJoin = 'round'; c.stroke();
+  circle(c, -32, -12, 11, '#2b1d3a'); circle(c, 32, -12, 11, '#2b1d3a');
+  circle(c, -28, -16, 4, '#ffffff'); circle(c, 36, -16, 4, '#ffffff');
+  ellipse(c, -56, 14, 14, 9, 'rgba(255,110,150,0.5)'); ellipse(c, 56, 14, 14, 9, 'rgba(255,110,150,0.5)');
+  c.strokeStyle = '#2b1d3a'; c.lineWidth = 8; c.lineCap = 'round';
+  c.beginPath(); c.arc(0, 10, 34, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+  c.restore();
+  // Michael jumping for joy
+  drawMichael(c, 470, 720, Math.max(1, 330 * k), { bounce: Math.abs(Math.sin(t * 5)) * 30, tilt: Math.sin(t * 5) * 0.06, flip: 1 });
 }
 
 // ---------- Inside the house ----------
@@ -2434,59 +2933,89 @@ function drawTVShow(c, ch, t, w, h) {
 }
 
 // ---------- HUD (no words: only pictures) ----------
+const HOME_BUTTON = { x: 52, y: 758, r: 30 };
+function drawHomeButton(c) {
+  const { x, y, r } = HOME_BUTTON;
+  circle(c, x, y + 3, r, 'rgba(10, 20, 60, 0.3)');
+  circle(c, x, y, r, '#ffffff');
+  c.strokeStyle = '#3a86ff'; c.lineWidth = 4; c.beginPath(); c.arc(x, y, r, 0, TAU); c.stroke();
+  c.fillStyle = '#ff5fa2';
+  c.beginPath(); c.moveTo(x - 17, y - 1); c.lineTo(x, y - 16); c.lineTo(x + 17, y - 1); c.closePath(); c.fill();
+  c.fillStyle = '#b57bff'; c.fillRect(x - 12, y - 2, 24, 17);
+  c.fillStyle = '#ffcf3f'; c.fillRect(x - 4, y + 5, 8, 10);
+}
 function drawHUD(c) {
+  if (game.mode === 'menu') return;
+  drawHomeButton(c); // back to the menu
   if (game.scene !== 'world') return;
   const t = game.time;
-  // Top-left: sky buttons found
-  const n = skyButtons.length;
-  roundRect(c, 16, 14, 84 + (n - 1) * 40 + 30 - 16, 56, 28, 'rgba(255,255,255,0.55)');
-  drawCloud(c, 44, 44, 0.32, 1);
-  skyButtons.forEach((b, i) => {
-    const x = 84 + i * 40, y = 42;
-    const pop = b.found ? 1 + game.hud.skyPop * 0.4 : 1;
-    if (b.found) { circle(c, x, y, 15 * pop, b.color); circle(c, x - 5, y - 5, 4, 'rgba(255,255,255,0.6)'); }
-    c.strokeStyle = b.found ? '#ffffff' : 'rgba(80,90,140,0.4)'; c.lineWidth = 3;
-    c.beginPath(); c.arc(x, y, 15 * pop, 0, TAU); c.stroke();
-  });
-  // Top-middle: one star per hiding dino found
-  const dinos = seek.dinos, found = dinos.filter((d) => d.found).length;
-  const rowW = dinos.length * 52;
-  roundRect(c, WORLD_W / 2 - rowW / 2 - 14, 14, rowW + 28, 56, 28, 'rgba(255,255,255,0.55)');
-  dinos.forEach((d, i) => {
-    const x = WORLD_W / 2 - rowW / 2 + 26 + i * 52, y = 42;
-    const on = i < found;
-    const s = on && i === found - 1 ? 1 + game.hud.starPop * 0.5 : 1;
-    c.save(); c.translate(x, y); c.scale(s, s);
-    if (on) c.rotate(Math.sin(t * 3 + i) * 0.1);
-    starPath(c, 0, 0, 21, 9.5, 5);
-    c.fillStyle = on ? '#ffd23f' : 'rgba(255,255,255,0.5)'; c.fill();
-    c.strokeStyle = on ? '#e09b00' : 'rgba(80,90,140,0.4)'; c.lineWidth = 3; c.stroke();
-    c.restore();
-  });
-  // Top-right: what time it is and what's on the menu
-  const tod = game.timeOfDay, menu = MENU[tod];
-  const boxW = 80 + menu.length * 54, bx = WORLD_W - 16 - boxW;
-  roundRect(c, bx, 14, boxW, 56, 28, 'rgba(255,255,255,0.55)');
-  const ix = bx + 36, iy = 42, pop = 1 + game.hud.timePop * 0.4;
-  c.save(); c.translate(ix, iy); c.scale(pop, pop);
-  if (tod === 'night') {
-    circle(c, 0, 0, 22, '#3d3a8c');
-    circle(c, 2, 0, 13, '#fff8d6'); circle(c, 8, -4, 11, '#3d3a8c');
-    circle(c, -12, -10, 1.6, '#fff'); circle(c, -8, 12, 1.4, '#fff');
-  } else if (tod === 'noon') {
-    circle(c, 0, 0, 22, '#7fd1ff');
-    circle(c, 0, -4, 11, '#fff27a');
-    c.strokeStyle = '#fff27a'; c.lineWidth = 2.5;
-    for (let i = 0; i < 8; i++) { const a = (i * TAU) / 8; c.beginPath(); c.moveTo(Math.cos(a) * 14, -4 + Math.sin(a) * 14); c.lineTo(Math.cos(a) * 18, -4 + Math.sin(a) * 18); c.stroke(); }
-  } else {
-    circle(c, 0, 0, 22, '#ffb36b');
-    c.save(); c.beginPath(); c.arc(0, 0, 22, 0, TAU); c.clip();
-    circle(c, 0, 8, 12, '#fff27a');
-    c.fillStyle = C.grassTop; c.fillRect(-22, 8, 44, 20);
-    c.restore();
+  if (activityOn('sky')) {
+    // Top-left: sky buttons found
+    const n = skyButtons.length;
+    roundRect(c, 16, 14, 84 + (n - 1) * 40 + 30 - 16, 56, 28, 'rgba(255,255,255,0.55)');
+    drawCloud(c, 44, 44, 0.32, 1);
+    skyButtons.forEach((b, i) => {
+      const x = 84 + i * 40, y = 42;
+      const pop = b.found ? 1 + game.hud.skyPop * 0.4 : 1;
+      if (b.found) { circle(c, x, y, 15 * pop, b.color); circle(c, x - 5, y - 5, 4, 'rgba(255,255,255,0.6)'); }
+      c.strokeStyle = b.found ? '#ffffff' : 'rgba(80,90,140,0.4)'; c.lineWidth = 3;
+      c.beginPath(); c.arc(x, y, 15 * pop, 0, TAU); c.stroke();
+    });
+  }
+  if (activityOn('seek')) {
+    // Top-middle: one star per hiding dino found
+    const dinos = seek.dinos, found = dinos.filter((d) => d.found).length;
+    const rowW = dinos.length * 52;
+    roundRect(c, WORLD_W / 2 - rowW / 2 - 14, 14, rowW + 28, 56, 28, 'rgba(255,255,255,0.55)');
+    dinos.forEach((d, i) => {
+      const x = WORLD_W / 2 - rowW / 2 + 26 + i * 52, y = 42;
+      const on = i < found;
+      const s = on && i === found - 1 ? 1 + game.hud.starPop * 0.5 : 1;
+      c.save(); c.translate(x, y); c.scale(s, s);
+      if (on) c.rotate(Math.sin(t * 3 + i) * 0.1);
+      starPath(c, 0, 0, 21, 9.5, 5);
+      c.fillStyle = on ? '#ffd23f' : 'rgba(255,255,255,0.5)'; c.fill();
+      c.strokeStyle = on ? '#e09b00' : 'rgba(80,90,140,0.4)'; c.lineWidth = 3; c.stroke();
+      c.restore();
+    });
+  }
+  if (game.mode === 'feed') {
+    // Top-middle: one plate per happy meal
+    const n = CONFIG.FEEDS_TO_FINISH, rowW = n * 64;
+    roundRect(c, WORLD_W / 2 - rowW / 2 - 14, 14, rowW + 28, 56, 28, 'rgba(255,255,255,0.55)');
+    for (let i = 0; i < n; i++) {
+      const x = WORLD_W / 2 - rowW / 2 + 32 + i * 64, y = 42, on = i < game.fedCount;
+      ellipse(c, x, y, 26, 15, on ? '#ffffff' : 'rgba(255,255,255,0.5)');
+      c.strokeStyle = on ? '#9ec5ff' : 'rgba(80,90,140,0.4)'; c.lineWidth = 3; c.beginPath(); c.ellipse(x, y, 26, 15, 0, 0, TAU); c.stroke();
+      if (on) { c.save(); c.translate(x, y + 1); c.scale(1 + Math.sin(t * 4 + i) * 0.08, 1 + Math.sin(t * 4 + i) * 0.08); c.fillStyle = '#ff4d8d'; heartPath(c, 20); c.fill(); c.restore(); }
+    }
+  }
+  if (usesFood()) {
+    // Top-right: what time it is and what's on the menu
+    const tod = game.timeOfDay, menu = MENU[tod];
+    const boxW = 80 + menu.length * 54, bx = WORLD_W - 16 - boxW;
+    roundRect(c, bx, 14, boxW, 56, 28, 'rgba(255,255,255,0.55)');
+    const ix = bx + 36, iy = 42, pop = 1 + game.hud.timePop * 0.4;
+    c.save(); c.translate(ix, iy); c.scale(pop, pop);
+    if (tod === 'night') {
+      circle(c, 0, 0, 22, '#3d3a8c');
+      circle(c, 2, 0, 13, '#fff8d6'); circle(c, 8, -4, 11, '#3d3a8c');
+      circle(c, -12, -10, 1.6, '#fff'); circle(c, -8, 12, 1.4, '#fff');
+    } else if (tod === 'noon') {
+      circle(c, 0, 0, 22, '#7fd1ff');
+      circle(c, 0, -4, 11, '#fff27a');
+      c.strokeStyle = '#fff27a'; c.lineWidth = 2.5;
+      for (let i = 0; i < 8; i++) { const a = (i * TAU) / 8; c.beginPath(); c.moveTo(Math.cos(a) * 14, -4 + Math.sin(a) * 14); c.lineTo(Math.cos(a) * 18, -4 + Math.sin(a) * 18); c.stroke(); }
+    } else {
+      circle(c, 0, 0, 22, '#ffb36b');
+      c.save(); c.beginPath(); c.arc(0, 0, 22, 0, TAU); c.clip();
+      circle(c, 0, 8, 12, '#fff27a');
+      c.fillStyle = C.grassTop; c.fillRect(-22, 8, 44, 20);
+      c.restore();
   }
   c.restore();
   menu.forEach((type, i) => drawFood(c, type, ix + 58 + i * 54, iy, 0.75));
+  }
 
   // muted speaker (for grown-ups)
   if (Sound.muted) {
@@ -2497,7 +3026,7 @@ function drawHUD(c) {
   }
 
   // Arrow-key hint until Michael first moves
-  if (!game.started) {
+  if (!game.started && !game.complete) {
     const p = 1 + Math.sin(t * 4) * 0.06;
     c.save(); c.translate(WORLD_W / 2, WORLD_H - 120); c.scale(p, p);
     const keyBox = (x, y, rot) => {
@@ -2525,7 +3054,9 @@ function draw() {
   c.beginPath(); c.rect(0, 0, WORLD_W, WORLD_H); c.clip();
   if (game.scene === 'world') drawWorld(c);
   else drawHouseInside(c);
+  if (game.mode === 'menu') drawMenu(c);
   drawHUD(c);
+  if (game.complete) drawComplete(c);
   if (game.fade) {
     const a = game.fade.t < 0.35 ? game.fade.t / 0.35 : 1 - (game.fade.t - 0.35) / 0.35;
     c.fillStyle = `rgba(255, 245, 230, ${clamp(a, 0, 1)})`;
@@ -2546,11 +3077,8 @@ function frame(now) {
 paintBackgroundLayer();
 loadMichael();
 game.timeOfDay = currentTimeOfDay();
-grumpy.want = pick(MENU[game.timeOfDay]);
-hungryDragons.forEach(newWish);
-for (let i = 0; i < CONFIG.NUMBER_OF_FOOD_ITEMS; i++) spawnFood(Math.random() < 0.6 ? pick(MENU[game.timeOfDay]) : pick(FOOD_TYPES));
-particles.length = 0;
+resetWorldForMode('menu');
 requestAnimationFrame(frame);
 
 // Handy for grown-ups testing in the browser console, e.g. AirplanesLand.startParade()
-window.AirplanesLand = { game, michael, CONFIG, startParade, startFlight, enterHouse, leaveHouse, seek, grumpy, hungryDragons, foods, skyButtons };
+window.AirplanesLand = { game, michael, CONFIG, startMode, goMenu, startParade, startFlight, enterHouse, leaveHouse, seek, grumpy, hungryDragons, foods, skyButtons, creatures, petCreature };
