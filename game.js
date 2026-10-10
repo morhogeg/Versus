@@ -876,7 +876,7 @@ window.addEventListener('keyup', (e) => {
   if (k) { keys[k] = false; e.preventDefault(); }
 });
 window.addEventListener('blur', () => { keys.left = keys.right = keys.up = keys.down = false; });
-// Touch: tap or hold anywhere and Michael walks there
+// Touch: Michael walks toward your finger while it's on the screen, and stops when you lift it
 const walkTo = { on: false, x: 0, y: 0, held: null };
 canvas.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch' && !touchMode) { touchMode = true; resize(); if (Sound.ctx) Voice.preload(); }
@@ -891,11 +891,18 @@ canvas.addEventListener('pointermove', (e) => {
   if (walkTo.held !== e.pointerId) return;
   const p = toWorld(e); walkTo.x = p.x; walkTo.y = p.y;
 });
-const letGo = (e) => { if (walkTo.held === e.pointerId) walkTo.held = null; Sound.unlock(); };
-canvas.addEventListener('pointerup', letGo);
-canvas.addEventListener('pointercancel', letGo);
-// iPhones switch sound on only at the end of a touch
-window.addEventListener('touchend', () => Sound.unlock());
+const stopWalking = () => {
+  if (walkTo.on) { michael.vx *= 0.2; michael.vy *= 0.2; } // stop right away instead of sliding on
+  walkTo.on = false; walkTo.held = null;
+};
+const letGo = (e) => { if (walkTo.held === e.pointerId) stopWalking(); Sound.unlock(); };
+window.addEventListener('pointerup', letGo);
+window.addEventListener('pointercancel', letGo);
+// iPhones switch sound on only at the end of a touch; and no fingers left = stop, whatever happened
+window.addEventListener('touchend', (e) => { Sound.unlock(); if (e.touches.length === 0) stopWalking(); });
+window.addEventListener('touchcancel', stopWalking);
+window.addEventListener('blur', stopWalking);
+document.addEventListener('visibilitychange', stopWalking);
 // no scrolling, zooming or text-selecting while playing
 canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -1969,8 +1976,7 @@ function updateMichael(dt, bounds) {
     const tx = clamp(walkTo.x, bounds.x1 + bounds.halfWidth, bounds.x2 - bounds.halfWidth);
     const ty = clamp(walkTo.y, bounds.y1, bounds.y2);
     const dx = tx - michael.x, dy = ty - michael.y, d = Math.hypot(dx, dy);
-    if (d < 14) { if (walkTo.held === null) walkTo.on = false; }
-    else { const slow = Math.min(1, d / 60); ix = (dx / d) * slow; iy = (dy / d) * slow; }
+    if (d >= 14) { const slow = Math.min(1, d / 60); ix = (dx / d) * slow; iy = (dy / d) * slow; }
   }
   const speed = CONFIG.MOVE_SPEED * (bounds.speedScale || 1);
   const k = 1 - Math.exp(-CONFIG.MOVE_SMOOTHNESS * dt); // smooth speeding up / slowing down

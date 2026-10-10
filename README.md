@@ -12,7 +12,7 @@ Double-click `index.html`.
 - **Help:** the orange speaker button (above the house button) says the explanation again. Pressing the **space bar** when nothing is nearby does the same. If Michael is stuck for a while, the explanation repeats and a yellow arrow points to the next thing to find.
 - Grown-ups: **M** turns all sound on/off, **B** turns only the background music on/off.
 
-**On an iPhone or iPad:** tap a card to pick a game. In the game, tap (or hold your finger) anywhere and Michael walks there; tap a dragon or dino next to him to pat it. The house and speaker buttons work the same. Turn the phone sideways: the game fills the screen even if the app around it stays upright. Sound starts with the first tap, and plays even when the phone's silent switch is on (on iOS 17 and newer). On a phone the game says touch versions of the lines that talk about the keys (the `*_touch` lines).
+**On an iPhone or iPad:** tap a card to pick a game. In the game, hold your finger on the screen and Michael walks toward it (move the finger and he follows); lift it and he stops; tap a dragon or dino next to him to pat it. The house and speaker buttons work the same. Turn the phone sideways: the game fills the screen even if the app around it stays upright. Sound starts with the first tap, and plays even when the phone's silent switch is on (on iOS 17 and newer). On a phone the game says touch versions of the lines that talk about the keys (the `*_touch` lines).
 
 ## Hebrew voice
 
