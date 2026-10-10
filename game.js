@@ -66,7 +66,7 @@ const CONFIG = {
   // Recorded voice files: put them in assets/voice/ named like the VOICE_LINES ids
   // (e.g. assets/voice/menu_hello.mp3) and write their type here, e.g. 'mp3'.
   // Leave '' to use the computer's built-in Hebrew voice.
-  VOICE_FILES: '',
+  VOICE_FILES: 'mp3',
   HINT_AFTER_SECONDS: 15, // if Michael is stuck this long, an arrow shows him where to go
   SCREEN_SHAKE: true,  // the grumpy dragon's stomp gives a tiny wobble
 

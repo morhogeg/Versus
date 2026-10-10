@@ -16,7 +16,9 @@ Double-click `index.html`.
 
 Every game has a Hebrew name on its card, and the game explains everything out loud in Hebrew: the menu, how to play each game, colors, foods, "you found one!", "well done!". Every sentence also appears as text at the bottom of the screen, so you can read it to him.
 
-The voice is the computer's own Hebrew voice:
+The narration is recorded with a Gemini voice. The files are in `assets/voice/` and are remade with `GEMINI_API_KEY=... python3 tools/make_voices.py` (or by running the "Make voice files" GitHub Action, which uses the `GEMINI_API_KEY` repository secret). The computer's own voice is only a fallback for a missing file.
+
+The fallback voice is the computer's own Hebrew voice:
 - **Mac, iPad, iPhone:** works in any browser (the "Carmit" voice).
 - **Windows:** use **Microsoft Edge**. It has very natural Hebrew voices. Chrome on Windows only speaks Hebrew if the Hebrew language pack is installed in Windows.
 
