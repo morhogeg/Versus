@@ -9,7 +9,20 @@ Double-click `index.html`.
 - **Menu:** six picture cards. Move with the **arrow keys**, press the **space bar** to pick (or click a card).
 - **In the world:** Michael walks with the **arrow keys**. Next to a dragon or dino a hand bubble pops up. Press the **space bar** to pat it, again for a trick (dragons breathe rainbow sparkles, dinos twirl and go "rawr"), and again to make it dance.
 - **Back to the menu:** the round house button in the bottom-left corner (click it), or **Esc**.
+- **Help:** the orange speaker button (above the house button) says the explanation again. Pressing the **space bar** when nothing is nearby does the same. If Michael is stuck for a while, the explanation repeats and a yellow arrow points to the next thing to find.
 - Grown-ups: **M** turns all sound on/off, **B** turns only the background music on/off.
+
+## Hebrew voice
+
+Every game has a Hebrew name on its card, and the game explains everything out loud in Hebrew: the menu, how to play each game, colors, foods, "you found one!", "well done!". Every sentence also appears as text at the bottom of the screen, so you can read it to him.
+
+The voice is the computer's own Hebrew voice:
+- **Mac, iPad, iPhone:** works in any browser (the "Carmit" voice).
+- **Windows:** use **Microsoft Edge**. It has very natural Hebrew voices. Chrome on Windows only speaks Hebrew if the Hebrew language pack is installed in Windows.
+
+If there's no Hebrew voice, the text still appears.
+
+**Your own voice (or any voice you like):** `assets/voice/LINES.md` lists every sentence with its file name. Record them (or generate them with any text-to-speech site), save them into `assets/voice/` with those names, and set `VOICE_FILES: 'mp3'` in `CONFIG`. Missing files fall back to the computer's voice. The sentences themselves are in `VOICE_LINES` in `game.js` if you want to change the wording.
 
 The five activities each end with a big smiling star and Michael cheering, then the menu comes back. **Free play** (the last card) has everything switched on and never ends, and it's the only mode where he can go into the house.
 

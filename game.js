@@ -10,6 +10,7 @@
      1. CONFIG .............. colors, sizes, speeds, how many things
      2. Helpers ............. small math + drawing helpers
      3. Sound ............... every sound, made with the Web Audio API
+                              + the Hebrew voice (VOICE_LINES: every sentence the game says)
      4. Michael's picture ... loads assets/michael.png, removes the white background
      5. Screen & keys ....... canvas scaling and arrow-key input
      6. Building the world .. where everything is placed
@@ -58,6 +59,15 @@ const CONFIG = {
   // ----- Sound & feel -----
   SOUND_VOLUME: 0.6,   // 0 = silent, 1 = loud
   MUSIC_VOLUME: 0.5,   // soft background music (0 = no music)
+
+  // ----- Hebrew voice -----
+  VOICE: true,         // speak the Hebrew explanations
+  VOICE_RATE: 0.9,     // talking speed (1 = normal, lower = slower)
+  // Recorded voice files: put them in assets/voice/ named like the VOICE_LINES ids
+  // (e.g. assets/voice/menu_hello.mp3) and write their type here, e.g. 'mp3'.
+  // Leave '' to use the computer's built-in Hebrew voice.
+  VOICE_FILES: '',
+  HINT_AFTER_SECONDS: 15, // if Michael is stuck this long, an arrow shows him where to go
   SCREEN_SHAKE: true,  // the grumpy dragon's stomp gives a tiny wobble
 
   // ----- World colors -----
@@ -256,6 +266,7 @@ const Sound = {
       this.master.connect(this.ctx.destination);
       this.tuneBus = this.ctx.createGain(); // little songs go here so they can be stopped
       this.tuneBus.connect(this.master);
+      Voice.sayWhenFree('menu_hello', 4, () => game.mode === 'menu'); // first time: say hello
       // one second of white noise, reused for puffs, chomps, whooshes
       const len = this.ctx.sampleRate;
       this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -267,6 +278,7 @@ const Sound = {
   ready() { return this.ctx && this.ctx.state === 'running'; },
   toggleMute() {
     this.muted = !this.muted;
+    if (this.muted) Voice.stop();
     if (this.master) this.master.gain.value = this.muted ? 0 : CONFIG.SOUND_VOLUME;
   },
 
@@ -397,6 +409,131 @@ const TUNES = {
   tv: [[76, 0.5], [79, 0.5], [84, 0.5], [79, 0.5], [81, 1]],
   happyDragon: [[72, 0.5], [74, 0.5], [76, 0.5], [79, 0.5], [84, 0.5], [79, 0.5], [84, 1.5]],
   dance: [[72, 0.5], [76, 0.5], [79, 0.5], [76, 0.5], [81, 0.5], [79, 0.5], [84, 1]],
+};
+
+// ---------- Hebrew voice ----------
+// Every sentence the game says. The id is also the file name for recorded voice files.
+const VOICE_LINES = {
+  // menu
+  menu_hello: 'שלום מיכאל! ברוך הבא לארץ המטוסים. בחר משחק עם החיצים, ולחץ על הרווח כדי לשחק.',
+  menu_again: 'מה נשחק עכשיו? בחר משחק עם החיצים, ולחץ על הרווח.',
+  // game names (said when a card is picked on the menu)
+  name_sky: 'צובעים את השמיים',
+  name_seek: 'מחבואים עם הדינוזאורים',
+  name_feed: 'מאכילים את הדרקונים',
+  name_grumpy: 'משמחים את הדרקון הכועס',
+  name_plane: 'טסים במטוס',
+  name_free: 'טיול חופשי בעיר',
+  // explanations (said when a game starts, and again if he's stuck or presses space)
+  sky_intro: 'צובעים את השמיים! בשלג מסתתרים חמישה כפתורים צבעוניים. לך עם החיצים ומצא אותם. כל כפתור צובע את השמיים בצבע אחר!',
+  seek_intro: 'מחבואים! הדינוזאורים התחבאו מאחורי העצים האדומים. אפשר לראות להם את הזנב! לך אל העצים ומצא את כולם.',
+  feed_intro: 'מאכילים את הדרקונים! שני דרקונים קטנים רעבים. בבועה רואים מה הם רוצים לאכול. מצא את האוכל, והבא להם אותו.',
+  grumpy_intro: 'הדרקון האפור כועס. בבועה רואים מה הוא רוצה לאכול. מצא את האוכל והבא לו, ואז הוא ישמח!',
+  plane_intro: 'טסים במטוס! לך עם החיצים אל המטוס הצהוב, והוא ייקח אותך לטיסה מעל כל העיר.',
+  free_intro: 'טיול חופשי! אפשר ללכת לכל מקום. כשאתה ליד דרקון או דינוזאור, לחץ על הרווח כדי ללטף אותו. אפשר גם להיכנס לבית הסגול ולראות טלוויזיה.',
+  // sky colors
+  sky_brown: 'השמיים חומים!',
+  sky_blue: 'השמיים כחולים!',
+  sky_yellow: 'השמיים צהובים!',
+  sky_green: 'השמיים ירוקים!',
+  sky_orange: 'השמיים כתומים!',
+  sky_all: 'מצאת את כל הכפתורים! הנה מגיע מצעד הדרקונים!',
+  // hide and seek
+  seek_found: 'מצאת דינוזאור! עכשיו הוא הולך איתך.',
+  seek_all: 'מצאת את כל הדינוזאורים!',
+  // food
+  food_pancakes: 'פנקייק!',
+  food_grilledCheese: 'טוסט גבינה!',
+  food_pasta: 'פסטה!',
+  food_pizza: 'פיצה!',
+  want_pancakes: 'הוא רוצה פנקייק. מצא פנקייק והבא לו!',
+  want_grilledCheese: 'הוא רוצה טוסט גבינה. מצא טוסט והבא לו!',
+  want_pasta: 'הוא רוצה פסטה. מצא פסטה והבא לו!',
+  want_pizza: 'הוא רוצה פיצה. מצא פיצה והבא לו!',
+  yum: 'יאמי! תודה!',
+  grumpy_happy: 'הדרקון כבר לא כועס! עכשיו הוא שמח!',
+  // airplane
+  plane_up: 'ממריאים! טסים מעל כל העיר!',
+  plane_land: 'נחתנו! איזו טיסה!',
+  // other
+  pet_hint: 'לחץ על הרווח כדי ללטף!',
+  house_intro: 'זה הבית. לך אל הטלוויזיה כדי להחליף ערוץ. כדי לצאת, לך למטה אל השטיח.',
+  great_job: 'כל הכבוד מיכאל! הצלחת!',
+};
+const SKY_COLOR_NAMES = ['brown', 'blue', 'yellow', 'green', 'orange']; // same order as CONFIG.SKY_BUTTONS
+// The Hebrew names shown on the menu cards
+const GAME_NAMES = { sky: VOICE_LINES.name_sky, seek: VOICE_LINES.name_seek, feed: VOICE_LINES.name_feed,
+                     grumpy: VOICE_LINES.name_grumpy, plane: VOICE_LINES.name_plane, free: VOICE_LINES.name_free };
+const HEBREW_FONT = '"Varela Round", "Arial Hebrew", Arial, sans-serif';
+
+const Voice = {
+  hebrewVoice: null,   // the computer's Hebrew voice, if it has one
+  subtitle: null,      // the sentence shown on screen while it is said
+  subtitleT: 0,
+  priority: 0,         // a more important sentence isn't cut off by a less important one
+  audio: null,
+  speaking: false,
+  init() {
+    if (!('speechSynthesis' in window)) return;
+    const pickVoice = () => {
+      const score = (v) => (/natural|online|neural/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (/carmit|hila|avri|asaf/i.test(v.name) ? 1 : 0);
+      const hebrew = speechSynthesis.getVoices().filter((v) => /^(he|iw)/i.test(v.lang)).sort((a, b) => score(b) - score(a));
+      this.hebrewVoice = hebrew[0] || null;
+    };
+    pickVoice();
+    speechSynthesis.addEventListener('voiceschanged', pickVoice);
+  },
+  // while a sentence is being said (or, with no voice, while its words are on screen)
+  busy() { return this.speaking || (!this.hebrewVoice && this.subtitleT > 0); },
+  // priority: 1 = little comments, 2 = big moments, 3 = menu card names, 4 = explanations, 5 = "well done!"
+  // A sentence only cuts off one that is less (or equally) important.
+  say(id, priority = 1) {
+    const text = VOICE_LINES[id];
+    if (!text) return;
+    if (this.busy() && priority < this.priority) return;
+    this.stop();
+    this.priority = priority;
+    this.subtitle = text;
+    this.subtitleT = 1.5 + text.length * 0.075; // how long the words stay on screen
+    if (!CONFIG.VOICE || Sound.muted) return;
+    if (CONFIG.VOICE_FILES) {
+      const a = new Audio(`assets/voice/${id}.${CONFIG.VOICE_FILES}`);
+      this.audio = a; this.speaking = true;
+      a.onended = () => { if (this.audio === a) this.speaking = false; };
+      a.onerror = () => { if (this.audio === a) { this.audio = null; this.speak(text); } };
+      a.play().catch(() => { if (this.audio === a) { this.audio = null; this.speak(text); } });
+      return;
+    }
+    this.speak(text);
+  },
+  speak(text) {
+    this.speaking = false;
+    if (!this.hebrewVoice) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = this.hebrewVoice; u.lang = this.hebrewVoice.lang; u.rate = CONFIG.VOICE_RATE; u.pitch = 1.05;
+    u.onend = u.onerror = () => { if (this.utterance === u) this.speaking = false; };
+    this.utterance = u; this.speaking = true;
+    setTimeout(() => speechSynthesis.speak(u), 60); // a tiny pause helps some browsers after cancel()
+  },
+  stop() {
+    if (this.audio) { this.audio.pause(); this.audio = null; }
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    this.utterance = null; this.speaking = false;
+  },
+  // Says it as soon as nothing else is being said (gives up after 10 seconds)
+  sayWhenFree(id, priority, stillWanted) {
+    let tries = 0;
+    const attempt = () => {
+      if (!stillWanted()) return;
+      if (!this.busy() || ++tries > 20) this.say(id, priority);
+      else setTimeout(attempt, 500);
+    };
+    setTimeout(attempt, 500);
+  },
+  update(dt) {
+    this.subtitleT = Math.max(0, this.subtitleT - dt);
+    if (this.subtitleT === 0 && !this.speaking) this.subtitle = null;
+  },
 };
 
 // ---------- Background music ----------
@@ -691,6 +828,10 @@ const game = {
   time: 0,
   mode: 'menu',          // 'menu', 'sky', 'seek', 'feed', 'grumpy', 'plane' or 'free'
   menuIndex: 0,          // which picture card is picked on the menu
+  lastProgress: 0,       // when Michael last did something right (for help and hint arrows)
+  lastHelp: -99,         // when the explanation was last said
+  helpRepeats: 0,
+  petHintSaid: false,
   complete: null,        // set while the "you did it!" celebration shows
   finishIn: 0,           // countdown to that celebration
   fedCount: 0,           // happy meals so far in "Feed the Dragons"
@@ -1054,6 +1195,7 @@ function moveMenuSelection(dir) {
   if (dir === 'right') game.menuIndex = i % 3 === 2 ? i - 2 : i + 1;
   if (dir === 'up' || dir === 'down') game.menuIndex = (i + 3) % 6;
   Sound.tick();
+  Voice.say('name_' + MENU_CARDS[game.menuIndex], 3);
 }
 // The SPACE BAR (or Enter): pick on the menu, pat a creature, change the TV channel
 function pressAction() {
@@ -1062,7 +1204,15 @@ function pressAction() {
   if (game.complete) { if (game.complete.t > 1.5) goMenu(); return; }
   if (game.scene === 'house') { changeChannel(); return; }
   if (game.petTarget) petCreature(game.petTarget);
+  else sayIntro(); // nothing to pat: explain the game again
 }
+// Says what to do in this game (on start, when he presses space, or when he seems stuck)
+function sayIntro() {
+  if (game.mode === 'menu' || game.complete || game.time - game.lastHelp < 3) return;
+  game.lastHelp = game.time;
+  Voice.say(game.scene === 'house' ? 'house_intro' : game.mode + '_intro', 4);
+}
+function progress() { game.lastProgress = game.time; } // Michael did something right
 // Clicks and taps: menu cards, the home button, the pat bubble
 function handlePointer(e) {
   const x = (e.clientX - view.offX) / view.scale, y = (e.clientY - view.offY) / view.scale;
@@ -1075,6 +1225,7 @@ function handlePointer(e) {
     return;
   }
   if (Math.hypot(x - HOME_BUTTON.x, y - HOME_BUTTON.y) < HOME_BUTTON.r + 6) { goMenu(); return; }
+  if (Math.hypot(x - HELP_BUTTON.x, y - HELP_BUTTON.y) < HELP_BUTTON.r + 6) { game.lastHelp = -99; sayIntro(); return; }
   if (game.complete) { if (game.complete.t > 1.5) goMenu(); return; }
   if (game.petTarget) {
     const p = promptPos(game.petTarget);
@@ -1089,12 +1240,13 @@ function startMode(mode) {
     game.mode = mode;
     game.started = false;
     resetWorldForMode(mode);
+    game.lastHelp = -99; sayIntro();
   });
 }
 function goMenu() {
   if (game.fade || game.mode === 'menu') return;
   Sound.chirp(0.9);
-  fadeTo(() => { game.mode = 'menu'; resetWorldForMode('menu'); });
+  fadeTo(() => { game.mode = 'menu'; resetWorldForMode('menu'); Voice.say('menu_again', 4); });
 }
 // Puts everything back in place so each activity starts fresh
 function resetWorldForMode(mode) {
@@ -1102,6 +1254,7 @@ function resetWorldForMode(mode) {
   game.scene = 'world'; game.complete = null; game.finishIn = 0;
   game.flight = null; game.parade = null; game.paradeDelay = 0; game.skyTarget = C.sky;
   game.petTarget = null; game.patAnim = null; game.fedCount = 0;
+  game.lastProgress = game.time; game.helpRepeats = 0; game.petHintSaid = mode === 'free'; // free play already explains patting
   Object.assign(plane, { x: plane.homeX, y: plane.homeY, alt: 0, facing: -1, tilt: 0, armed: true });
   Object.assign(game.camera, { x: WORLD_W / 2, y: WORLD_H / 2, zoom: 1 });
   Object.assign(michael, { x: 720, y: 600, vx: 0, vy: 0, carry: [], hidden: mode === 'menu', facing: 1, flipX: 1 });
@@ -1118,7 +1271,15 @@ function completeActivity() {
   if (game.mode === 'menu' || game.mode === 'free') return;
   game.complete = { t: 0 };
   Sound.fanfare(); Sound.cheer();
+  Voice.say('great_job', 5);
   for (let i = 0; i < 6; i++) confetti(rand(200, 1240), rand(100, 400), 25);
+}
+function updateHelp() {
+  const playing = game.mode !== 'menu' && game.mode !== 'free' && !game.complete && !game.flight && !game.fade && game.scene === 'world';
+  if (playing && game.helpRepeats < 3 && game.time - game.lastProgress > 30 && game.time - game.lastHelp > 30 && !Voice.busy()) {
+    game.helpRepeats++;
+    sayIntro();
+  }
 }
 function updateFinishing(dt) {
   if (game.finishIn > 0) {
@@ -1150,6 +1311,7 @@ function updatePetting(dt) {
     if (d < bestD) { best = c; bestD = d; }
   }
   game.petTarget = best;
+  if (best && !game.petHintSaid) { game.petHintSaid = true; Voice.say('pet_hint', 1); }
 }
 function isBusy(c) { return c.petT > 0 || c.spinT > 0 || c.danceT > 0 || c.trickT > 0; }
 function petCreature(c) {
@@ -1237,6 +1399,7 @@ function updateFoods(dt) {
     if (!michael.hidden && game.scene === 'world' && touching(f.x, f.y, 42, 30)) {
       foods.splice(i, 1);
       Sound.pop(); Sound.sparkle();
+      Voice.say('food_' + f.type, 1); progress();
       burst('sparkle', f.x, f.y - 15, 14, { colors: ['#fff27a', '#ffffff', '#ffb3e6'], speed: 160 });
       // fly onto Michael's head
       flyingFoods.push({
@@ -1302,13 +1465,15 @@ function updateHungryDragons(dt) {
         d.mouthOpen = 1;
       } else if (arrived(d, near)) {
         d.bubblePop = 1; Sound.hmm(); // "this one, please!"
+        Voice.say('want_' + d.want, 1);
       }
     } else if (d.state === 'eating') {
       d.mouthOpen = (Math.sin(game.time * 18) > 0) ? 1 : 0.2;
       if (d.stateT <= 0) {
         d.state = 'happy'; d.stateT = 2.6; d.happyT = 1.4; d.mouthOpen = 1;
         Sound.cheer(); Sound.chirp(d.pitch);
-        game.fedCount++;
+        game.fedCount++; progress();
+        Voice.say('yum', 1);
         if (game.mode === 'feed' && game.fedCount >= CONFIG.FEEDS_TO_FINISH) game.finishIn = 2.8;
         hearts(d.x, d.y - 80 * d.size, 8);
         confetti(d.x, d.y - 60, 24);
@@ -1361,6 +1526,7 @@ function updateGrumpy(dt) {
     } else if (arrived(g, near)) {
       // "Hmph!" - turns away and puffs, but never does anything to Michael
       Sound.grumble();
+      Voice.say('want_' + g.want, 1);
       g.facing = michael.x > g.x ? -1 : 1;
       g.bubblePop = 1;
       for (let i = 0; i < 5; i++) addParticle({ type: 'smoke', x: g.x, y: g.y - 95 * g.size, vx: rand(-30, 30), vy: rand(-50, -20), size: rand(5, 8), color: '#b8b2c4', life: 1.1 });
@@ -1380,7 +1546,8 @@ function updateGrumpy(dt) {
       g.state = 'happy'; g.mood = 'happy'; g.moodMix = 1; g.happyT = 1.4; g.happyTime = 0; g.speed = 45; g.mouthOpen = 0;
       Sound.cheer(); Sound.playTune(TUNES.happyDragon, 260, 'triangle', 0.14, 1, 0.3);
       hearts(g.x, g.y - 120, 12); confetti(g.x, g.y - 100, 40);
-      if (game.mode === 'grumpy') game.finishIn = 3;
+      Voice.say('grumpy_happy', 2); progress();
+      if (game.mode === 'grumpy') game.finishIn = 3.5;
     }
   } else if (g.state === 'happy') {
     if (g.happyT <= 0 && !isBusy(g)) wander(g, dt, WANDER_AREA);
@@ -1417,13 +1584,14 @@ function updateSkyButtons(dt) {
       b.press = 1;
       game.skyTarget = b.color;
       Sound.click(); Sound.magic();
+      Voice.say('sky_' + SKY_COLOR_NAMES[skyButtons.indexOf(b)], 1);
       burst('sparkle', b.x, b.y - 10, 16, { color: b.color, speed: 170 });
       burst('sparkle', b.x, b.y - 10, 8, { color: '#ffffff', speed: 120 });
       if (!b.found) {
-        b.found = true;
+        b.found = true; progress();
         game.hud.skyPop = 1;
         burst('dust', b.x, b.y - 6, 14, { color: '#ffffff', speed: 110, size: 6, life: 0.8 });
-        if (skyButtons.every((s) => s.found) && !game.parade) game.paradeDelay = 1.3;
+        if (skyButtons.every((s) => s.found) && !game.parade) { game.paradeDelay = 1.3; setTimeout(() => Voice.say('sky_all', 2), 900); }
       }
     }
   }
@@ -1496,6 +1664,8 @@ function updateHideAndSeek(dt) {
         confetti(tree.x, tree.y - 100, 30);
         burst('sparkle', tree.x, tree.y - 110, 12, { color: '#ffd23f', speed: 200 });
         const foundCount = seek.dinos.filter((x) => x.found).length;
+        progress();
+        Voice.say(foundCount === seek.dinos.length ? 'seek_all' : 'seek_found', 1);
         if (foundCount === seek.dinos.length) {
           seek.celebrate = 4.5;
           if (game.mode === 'seek') game.finishIn = 3;
@@ -1580,7 +1750,7 @@ function updateFlight(dt) {
   if (!f) return;
   if (f.phase === 'boarding') {
     f.bt += dt;
-    if (f.bt >= 0.7) { f.phase = 'flying'; michael.hidden = true; Sound.startEngine(); Sound.whoosh(); }
+    if (f.bt >= 0.7) { f.phase = 'flying'; michael.hidden = true; Sound.startEngine(); Sound.whoosh(); Voice.say('plane_up', 2); progress(); }
   } else if (f.phase === 'flying') {
     f.t += dt;
     const u = f.t / CONFIG.FLIGHT_SECONDS;
@@ -1611,6 +1781,7 @@ function updateFlight(dt) {
       f.phase = 'landing'; f.bt = 0;
       plane.x = plane.homeX; plane.y = plane.homeY; plane.alt = 0; plane.tilt = 0; plane.facing = -1;
       Sound.stopEngine(); Sound.playTune(TUNES.landing, 200, 'triangle', 0.18);
+      Voice.say('plane_land', 1);
       michael.hidden = false;
     }
   } else if (f.phase === 'landing') {
@@ -1668,6 +1839,7 @@ function enterHouse() {
     particles.length = 0;
     tv.armed = false; tv.channelT = 0; tv.staticT = 0.4;
     Sound.playTune(TUNES.tv, 220, 'triangle', 0.15, 1, 0.3);
+    game.lastHelp = -99; sayIntro();
   });
 }
 function leaveHouse() {
@@ -1876,7 +2048,9 @@ function update(dt) {
   updateFade(dt);
   // background music: starts after the first key press, quieter while songs play
   Music.start();
-  Music.setLevel(game.parade || game.complete || game.scene === 'house' ? 0.3 : 1);
+  Music.setLevel(game.parade || game.complete || game.scene === 'house' || Voice.speaking ? 0.3 : 1);
+  Voice.update(dt);
+  updateHelp();
   game.shake = Math.max(0, game.shake - dt * 12);
   for (const k of ['skyPop', 'starPop', 'timePop']) game.hud[k] = Math.max(0, game.hud[k] - dt * 2.5);
 }
@@ -2635,6 +2809,22 @@ function drawPatHand(c) {
 function drawGuideArrow(c) {
   if (game.flight || game.complete || game.mode === 'menu') return;
   let target = null;
+  // stuck for a while? point at the nearest thing to find
+  const stuck = game.mode !== 'free' && game.time - game.lastProgress > CONFIG.HINT_AFTER_SECONDS;
+  const nearest = (list) => list.sort((a, b) => Math.hypot(a.x - michael.x, a.y - michael.y) - Math.hypot(b.x - michael.x, b.y - michael.y))[0];
+  if (stuck && game.mode === 'sky') {
+    const b = nearest(skyButtons.filter((s) => !s.found));
+    if (b) target = { x: b.x, y: b.y - 50 };
+  }
+  if (stuck && game.mode === 'seek') {
+    const d = nearest(seek.dinos.filter((x) => x.state === 'hidden').map((x) => trees[x.tree]));
+    if (d) target = { x: d.x, y: d.y - 200 };
+  }
+  if (stuck && (game.mode === 'feed' || game.mode === 'grumpy')) {
+    const wants = game.mode === 'feed' ? hungryDragons.filter((d) => d.state === 'waiting').map((d) => d.want) : [grumpy.want];
+    const f = nearest(foods.filter((x) => wants.includes(x.type)));
+    if (f) target = { x: f.x, y: f.y - 70 };
+  }
   if (game.mode === 'plane') target = { x: plane.homeX - 20, y: plane.homeY - 135 };
   if (activityOn('feed')) for (const d of hungryDragons) if (d.state === 'waiting' && michael.carry.includes(d.want)) target = { x: d.x + d.facing * 10, y: d.y - 200 };
   if (activityOn('grumpy') && grumpy.state === 'grumpy' && michael.carry.includes(grumpy.want)) target = { x: grumpy.x + 20, y: grumpy.y - 240 };
@@ -2643,8 +2833,8 @@ function drawGuideArrow(c) {
 
 // ---------- The menu: 6 big picture cards (no reading needed) ----------
 function menuCardRect(i) {
-  const w = 340, h = 240, col = i % 3, row = Math.floor(i / 3);
-  return { x: 170 + col * (w + 40), y: 225 + row * (h + 45), w, h };
+  const w = 340, h = 225, col = i % 3, row = Math.floor(i / 3);
+  return { x: 170 + col * (w + 40), y: 140 + row * (h + 55), w, h };
 }
 // little creatures that live on the cards
 const cardCritters = {
@@ -2661,10 +2851,12 @@ function drawMenu(c) {
   // Michael flying his airplane across the top
   const facing = Math.cos(t * 0.45) >= 0 ? 1 : -1;
   c.save();
-  c.translate(720 + Math.sin(t * 0.45) * 430, 160 + Math.sin(t * 1.7) * 8);
-  c.scale(0.85, 0.85);
+  c.translate(720 + Math.sin(t * 0.45) * 520, 110 + Math.sin(t * 1.7) * 8);
+  c.scale(0.7, 0.7);
   drawAirplane(c, 0, 0, { facing, tilt: Math.sin(t * 1.7) * 0.06, withMichael: true, flying: true });
   c.restore();
+  // the game's name: Airplane's Land
+  drawHebrewText(c, 'ארץ המטוסים', 720, 64, 58, '#ffffff', '#3a2a8c', 10);
   MENU_CARDS.forEach((mode, i) => drawMenuCard(c, i, mode, i === game.menuIndex));
 }
 function drawMenuCard(c, i, mode, selected) {
@@ -2681,10 +2873,18 @@ function drawMenuCard(c, i, mode, selected) {
   c.restore();
   roundRect(c, -r.w / 2, -r.h / 2, r.w, r.h, 30, null, selected ? '#ffd23f' : '#ffffff', selected ? 10 : 5);
   c.restore();
-  if (selected) {
-    drawDownArrow(c, r.x + r.w / 2, r.y - 30 - Math.abs(Math.sin(t * 4)) * 10, 0.9);
-    drawSpaceKey(c, r.x + r.w / 2, r.y + r.h + 26, 1.4);
-  }
+  // the Hebrew name on a label along the bottom edge (with a space-bar picture on the chosen card)
+  const name = GAME_NAMES[mode];
+  c.save();
+  c.font = `30px ${HEBREW_FONT}`;
+  const size = Math.min(30, 30 * 290 / c.measureText(name).width);
+  c.restore();
+  const lw = 320, lh = 48, lx = r.x + r.w / 2, ly = r.y + r.h + 2;
+  c.save(); c.translate(lx, ly); c.scale(pop, pop);
+  roundRect(c, -lw / 2, -lh / 2, lw, lh, lh / 2, selected ? '#ffd23f' : '#ffffff', selected ? '#e09b00' : '#9ec5ff', 4);
+  drawHebrewText(c, name, 0, 2, size, '#2b1d3a', null, 0);
+  c.restore();
+  if (selected) drawSpaceKey(c, lx, ly + 44, 1.2);
 }
 function drawCardScene(c, mode, w, h) {
   const t = game.time, bottom = h / 2;
@@ -2759,6 +2959,59 @@ function drawCardScene(c, mode, w, h) {
     drawMichael(c, Math.sin(t * 0.8) * 45, bottom - 18, 165, { bounce: Math.abs(Math.sin(t * 9)) * 6, tilt: Math.sin(t * 9) * 0.06, flip });
     snow();
   }
+}
+
+// ---------- Hebrew text, subtitles and the help button ----------
+function drawHebrewText(c, text, x, y, size, fill, outline, outlineWidth) {
+  c.save();
+  c.font = `${size}px ${HEBREW_FONT}`;
+  c.direction = 'rtl'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (outline) { c.strokeStyle = outline; c.lineWidth = outlineWidth; c.lineJoin = 'round'; c.strokeText(text, x, y); }
+  c.fillStyle = fill; c.fillText(text, x, y);
+  c.restore();
+}
+// The sentence being said, shown at the bottom so a grown-up can read along
+function drawSubtitle(c) {
+  if (!Voice.subtitle) return;
+  const size = 30, maxW = 980;
+  c.save();
+  c.font = `${size}px ${HEBREW_FONT}`;
+  // wrap into lines
+  const words = Voice.subtitle.split(' '), lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (c.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  lines.push(line);
+  c.restore();
+  const lh = 42, h = lines.length * lh + 26, y = WORLD_H - 16 - h;
+  const fade = Math.min(1, Voice.subtitleT * 3 + (Voice.speaking ? 1 : 0));
+  c.save();
+  c.globalAlpha = fade;
+  roundRect(c, WORLD_W / 2 - maxW / 2 - 50, y, maxW + 100, h, 26, 'rgba(255,255,255,0.94)', '#3a86ff', 4);
+  // little speaker on the right (Hebrew reads right to left)
+  const sx = WORLD_W / 2 + maxW / 2 + 18, sy = y + h / 2;
+  c.fillStyle = '#3a86ff';
+  c.beginPath(); c.moveTo(sx - 12, sy - 6); c.lineTo(sx - 4, sy - 6); c.lineTo(sx + 6, sy - 14); c.lineTo(sx + 6, sy + 14); c.lineTo(sx - 4, sy + 6); c.lineTo(sx - 12, sy + 6); c.closePath(); c.fill();
+  lines.forEach((l, i) => drawHebrewText(c, l, WORLD_W / 2, y + 13 + lh / 2 + i * lh, size, '#2b1d3a', null, 0));
+  c.restore();
+}
+const HELP_BUTTON = { x: 52, y: 686, r: 30 };
+function drawHelpButton(c) {
+  const { x, y, r } = HELP_BUTTON;
+  const pulse = Voice.speaking ? 1 + Math.sin(game.time * 10) * 0.06 : 1;
+  c.save(); c.translate(x, y); c.scale(pulse, pulse);
+  circle(c, 0, 3, r, 'rgba(10, 20, 60, 0.3)');
+  circle(c, 0, 0, r, '#ffffff');
+  c.strokeStyle = '#ff9f1c'; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke();
+  // speaker with sound waves = "say it again"
+  c.fillStyle = '#ff9f1c';
+  c.beginPath(); c.moveTo(-14, -6); c.lineTo(-6, -6); c.lineTo(4, -15); c.lineTo(4, 15); c.lineTo(-6, 6); c.lineTo(-14, 6); c.closePath(); c.fill();
+  c.strokeStyle = '#ff9f1c'; c.lineWidth = 3; c.lineCap = 'round';
+  c.beginPath(); c.arc(6, 0, 8, -0.8, 0.8); c.stroke();
+  c.beginPath(); c.arc(6, 0, 14, -0.8, 0.8); c.stroke();
+  c.restore();
 }
 
 // ---------- "You did it!" ----------
@@ -2947,6 +3200,7 @@ function drawHomeButton(c) {
 function drawHUD(c) {
   if (game.mode === 'menu') return;
   drawHomeButton(c); // back to the menu
+  drawHelpButton(c); // say the explanation again
   if (game.scene !== 'world') return;
   const t = game.time;
   if (activityOn('sky')) {
@@ -3028,7 +3282,7 @@ function drawHUD(c) {
   // Arrow-key hint until Michael first moves
   if (!game.started && !game.complete) {
     const p = 1 + Math.sin(t * 4) * 0.06;
-    c.save(); c.translate(WORLD_W / 2, WORLD_H - 120); c.scale(p, p);
+    c.save(); c.translate(WORLD_W / 2, WORLD_H - 230); c.scale(p, p);
     const keyBox = (x, y, rot) => {
       roundRect(c, x - 28, y - 28, 56, 56, 12, 'rgba(255,255,255,0.9)', '#3a86ff', 4);
       c.save(); c.translate(x, y); c.rotate(rot);
@@ -3057,6 +3311,7 @@ function draw() {
   if (game.mode === 'menu') drawMenu(c);
   drawHUD(c);
   if (game.complete) drawComplete(c);
+  drawSubtitle(c);
   if (game.fade) {
     const a = game.fade.t < 0.35 ? game.fade.t / 0.35 : 1 - (game.fade.t - 0.35) / 0.35;
     c.fillStyle = `rgba(255, 245, 230, ${clamp(a, 0, 1)})`;
@@ -3078,7 +3333,9 @@ paintBackgroundLayer();
 loadMichael();
 game.timeOfDay = currentTimeOfDay();
 resetWorldForMode('menu');
+Voice.init();
+if (document.fonts) document.fonts.load(`30px ${HEBREW_FONT}`).catch(() => {});
 requestAnimationFrame(frame);
 
 // Handy for grown-ups testing in the browser console, e.g. AirplanesLand.startParade()
-window.AirplanesLand = { game, michael, CONFIG, startMode, goMenu, startParade, startFlight, enterHouse, leaveHouse, seek, grumpy, hungryDragons, foods, skyButtons, creatures, petCreature };
+window.AirplanesLand = { game, michael, CONFIG, Voice, startMode, goMenu, startParade, startFlight, enterHouse, leaveHouse, seek, grumpy, hungryDragons, foods, skyButtons, creatures, petCreature };
