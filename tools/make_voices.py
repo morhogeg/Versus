@@ -14,7 +14,7 @@ import base64, json, os, re, subprocess, sys, time, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'voice')
-MODEL = os.environ.get('GEMINI_TTS_MODEL', 'gemini-3.8-flash-lite-tts')
+MODEL = os.environ.get('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts')
 VOICE = os.environ.get('GEMINI_TTS_VOICE', 'Leda')  # a warm, youthful voice
 STYLE = ('Read this aloud in Hebrew, in a warm, happy, gentle voice, like a kind kindergarten teacher '
          'talking to a 4-year-old boy named Michael. Speak clearly and a little slowly, with a smile. '
@@ -24,6 +24,14 @@ LITE = 'lite' in MODEL
 SYSTEM = ('You read Hebrew sentences aloud for a 4-year-old boy named Michael: a warm, happy, gentle voice, '
           'like a kind kindergarten teacher, clear and a little slow, with a smile. Say only the sentence you are given.')
 use_system = True  # turned off if the model refuses a system instruction
+PACE = float(os.environ.get('GEMINI_PACE', '7'))  # seconds between requests, to stay under the per-minute limit
+
+class QuotaError(Exception):
+    def __init__(self, body):
+        super().__init__(body[:600])
+        self.daily = 'PerDay' in body or 'per_day' in body.lower()
+        m = re.search(r'"retryDelay":\s*"(\d+)', body)
+        self.wait = int(m.group(1)) + 2 if m else 30
 
 def read_lines():
     src = open(os.path.join(ROOT, 'game.js'), encoding='utf-8').read()
@@ -64,6 +72,8 @@ def synthesize(text, key, attempt=0):
             part = cand['content']['parts'][0]['inlineData']
             return base64.b64decode(part['data']), part.get('mimeType', '')
         except urllib.error.HTTPError as e:
+            if e.code == 429:
+                raise QuotaError(e.read().decode(errors='replace'))
             if e.code == 400 and 'systemInstruction' in body:
                 use_system = False  # try again without it
             errors.append(f'{url.split("/")[2]}: HTTP {e.code} {e.read()[:300].decode(errors="replace")}')
@@ -101,7 +111,13 @@ def main():
                     raise RuntimeError(f'audio is only {secs:.1f}s')
                 to_mp3(pcm, mime, path)
                 print('ok  ', vid)
+                time.sleep(PACE)
                 break
+            except QuotaError as e:
+                if e.daily:
+                    sys.exit('Stopped: the Gemini daily quota for ' + MODEL + ' is used up. Run again tomorrow.\n' + str(e))
+                print('wait', vid, f'(quota per minute, waiting {e.wait}s)')
+                time.sleep(e.wait)
             except Exception as e:
                 print('fail', vid, f'(try {attempt + 1})\n ', e)
                 time.sleep(5 * (attempt + 1))

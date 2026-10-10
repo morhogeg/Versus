@@ -55,10 +55,13 @@ def main():
         for attempt in range(3):
             try:
                 heard = transcribe(path, model, key); break
+            except urllib.error.HTTPError as e:
+                print('  retry', vid, 'HTTP', e.code); time.sleep(40 if e.code == 429 else 5)
             except Exception as e:
                 print('  retry', vid, e); time.sleep(5 * (attempt + 1))
         if heard is None:
             print('ERROR  ', vid); bad.append(vid); continue
+        time.sleep(4)
         score = difflib.SequenceMatcher(None, plain(text), plain(heard)).ratio()
         ok = score >= 0.8
         print('ok     ' if ok else 'BAD    ', vid, f'{score:.2f}', '|', plain(heard))
