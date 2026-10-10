@@ -260,12 +260,15 @@ const Sound = {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
+      // iPhone: play even when the ring/silent switch is on silent
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
       this.ctx = new AC();
       this.master = this.ctx.createGain();
       this.master.gain.value = CONFIG.SOUND_VOLUME;
       this.master.connect(this.ctx.destination);
       this.tuneBus = this.ctx.createGain(); // little songs go here so they can be stopped
       this.tuneBus.connect(this.master);
+      Voice.preload();
       Voice.sayWhenFree('menu_hello', 4, () => game.mode === 'menu'); // first time: say hello
       // one second of white noise, reused for puffs, chomps, whooshes
       const len = this.ctx.sampleRate;
@@ -459,7 +462,16 @@ const VOICE_LINES = {
   pet_hint: 'לחץ על הרווח כדי ללטף!',
   house_intro: 'זה הבית. לך אל הטלוויזיה כדי להחליף ערוץ. כדי לצאת, לך למטה אל השטיח.',
   great_job: 'כל הכבוד מיכאל! הצלחת!',
+  // on a phone or tablet these are said instead of the ones that talk about the arrow keys and space bar
+  menu_hello_touch: 'שלום מיכאל! ברוך הבא לארץ המטוסים. גע במשחק כדי לשחק.',
+  menu_again_touch: 'מה נשחק עכשיו? גע במשחק שאתה רוצה.',
+  sky_intro_touch: 'צובעים את השמיים! בשלג מסתתרים חמישה כפתורים צבעוניים. גע במסך כדי ללכת, ומצא אותם. כל כפתור צובע את השמיים בצבע אחר!',
+  plane_intro_touch: 'טסים במטוס! גע במטוס הצהוב כדי ללכת אליו, והוא ייקח אותך לטיסה מעל כל העיר.',
+  free_intro_touch: 'טיול חופשי! גע במסך כדי ללכת לכל מקום. כשאתה ליד דרקון או דינוזאור, גע בו כדי ללטף אותו. אפשר גם להיכנס לבית הסגול ולראות טלוויזיה.',
+  pet_hint_touch: 'גע בו כדי ללטף אותו!',
 };
+// Phone or tablet? (also switched on by the first finger tap)
+let touchMode = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
 const SKY_COLOR_NAMES = ['brown', 'blue', 'yellow', 'green', 'orange']; // same order as CONFIG.SKY_BUTTONS
 // The Hebrew names shown on the menu cards
 const GAME_NAMES = { sky: VOICE_LINES.name_sky, seek: VOICE_LINES.name_seek, feed: VOICE_LINES.name_feed,
@@ -488,6 +500,7 @@ const Voice = {
   // priority: 1 = little comments, 2 = big moments, 3 = menu card names, 4 = explanations, 5 = "well done!"
   // A sentence only cuts off one that is less (or equally) important.
   say(id, priority = 1) {
+    if (touchMode && VOICE_LINES[id + '_touch']) id += '_touch';
     const text = VOICE_LINES[id];
     if (!text) return;
     if (this.busy() && priority < this.priority) return;
@@ -496,6 +509,20 @@ const Voice = {
     this.subtitle = text;
     this.subtitleT = 1.5 + text.length * 0.075; // how long the words stay on screen
     if (!CONFIG.VOICE || Sound.muted) return;
+    if (CONFIG.VOICE_FILES && location.protocol !== 'file:' && Sound.ready()) {
+      // Web Audio: once the first tap has switched sound on, it can play at any time (iPhones block <audio> otherwise)
+      const token = {};
+      this.current = token; this.speaking = true;
+      this.load(id).then((buf) => {
+        if (this.current !== token) return;
+        if (!buf) { this.speak(text); return; }
+        const src = Sound.ctx.createBufferSource();
+        src.buffer = buf; src.connect(Sound.ctx.destination);
+        src.onended = () => { if (this.current === token) this.speaking = false; };
+        src.start(); this.source = src;
+      });
+      return;
+    }
     if (CONFIG.VOICE_FILES) {
       const a = new Audio(`assets/voice/${id}.${CONFIG.VOICE_FILES}`);
       this.audio = a; this.speaking = true;
@@ -505,6 +532,21 @@ const Voice = {
       return;
     }
     this.speak(text);
+  },
+  buffers: {},
+  // Fetches and decodes a voice file once (null if it's missing)
+  load(id) {
+    if (!this.buffers[id]) {
+      this.buffers[id] = fetch(`assets/voice/${id}.${CONFIG.VOICE_FILES}`)
+        .then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then((data) => new Promise((ok, fail) => Sound.ctx.decodeAudioData(data, ok, fail)))
+        .catch(() => null);
+    }
+    return this.buffers[id];
+  },
+  preload() {
+    if (!CONFIG.VOICE_FILES || location.protocol === 'file:') return;
+    Object.keys(VOICE_LINES).forEach((id) => { if (touchMode === id.endsWith('_touch') || !VOICE_LINES[id + '_touch']) this.load(id); });
   },
   speak(text) {
     this.speaking = false;
@@ -517,6 +559,8 @@ const Voice = {
   },
   stop() {
     if (this.audio) { this.audio.pause(); this.audio = null; }
+    if (this.source) { try { this.source.stop(); } catch (e) {} this.source = null; }
+    this.current = null;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     this.utterance = null; this.speaking = false;
   },
@@ -785,18 +829,32 @@ function tryNextSource(sources, index) {
    ===================================================================== */
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const view = { scale: 1, offX: 0, offY: 0, dpr: 1 };
+const view = { scale: 1, offX: 0, offY: 0, dpr: 1, rotated: false };
 
+// On a phone held upright the game is drawn sideways, so turning the phone shows it full size
+// (even when the app around it doesn't turn).
 function resize() {
-  view.dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(window.innerWidth * view.dpr);
-  canvas.height = Math.round(window.innerHeight * view.dpr);
-  view.scale = Math.min(window.innerWidth / WORLD_W, window.innerHeight / WORLD_H);
-  view.offX = (window.innerWidth - WORLD_W * view.scale) / 2;
-  view.offY = (window.innerHeight - WORLD_H * view.scale) / 2;
+  const w = window.innerWidth, h = window.innerHeight;
+  view.dpr = Math.min(window.devicePixelRatio || 1, 2); // sharper than 2x only costs speed
+  canvas.width = Math.round(w * view.dpr);
+  canvas.height = Math.round(h * view.dpr);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  view.rotated = touchMode && h > w;
+  const lw = view.rotated ? h : w, lh = view.rotated ? w : h; // the screen as the game sees it
+  view.scale = Math.min(lw / WORLD_W, lh / WORLD_H);
+  view.offX = (lw - WORLD_W * view.scale) / 2;
+  view.offY = (lh - WORLD_H * view.scale) / 2;
 }
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 100));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 resize();
+// Screen point (a tap) -> point in the game world
+function toWorld(e) {
+  let x = e.clientX, y = e.clientY;
+  if (view.rotated) { const lx = y; y = window.innerWidth - x; x = lx; }
+  return { x: (x - view.offX) / view.scale, y: (y - view.offY) / view.scale };
+}
 
 const keys = { left: false, right: false, up: false, down: false };
 const KEYMAP = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -804,7 +862,7 @@ window.addEventListener('keydown', (e) => {
   Sound.unlock();
   const k = KEYMAP[e.key];
   if (k) {
-    keys[k] = true; e.preventDefault();
+    keys[k] = true; e.preventDefault(); walkTo.on = false;
     if (game.mode === 'menu') { if (!e.repeat) moveMenuSelection(k); }
     else game.started = true;
   }
@@ -818,7 +876,29 @@ window.addEventListener('keyup', (e) => {
   if (k) { keys[k] = false; e.preventDefault(); }
 });
 window.addEventListener('blur', () => { keys.left = keys.right = keys.up = keys.down = false; });
-window.addEventListener('pointerdown', (e) => { Sound.unlock(); handlePointer(e); });
+// Touch: tap or hold anywhere and Michael walks there
+const walkTo = { on: false, x: 0, y: 0, held: null };
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' && !touchMode) { touchMode = true; resize(); if (Sound.ctx) Voice.preload(); }
+  Sound.unlock();
+  if (handlePointer(e)) return;
+  if (game.mode === 'menu' || michael.hidden || game.fade || game.complete) return;
+  const p = toWorld(e);
+  Object.assign(walkTo, { on: true, x: p.x, y: p.y, held: e.pointerId });
+  game.started = true;
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (walkTo.held !== e.pointerId) return;
+  const p = toWorld(e); walkTo.x = p.x; walkTo.y = p.y;
+});
+const letGo = (e) => { if (walkTo.held === e.pointerId) walkTo.held = null; Sound.unlock(); };
+canvas.addEventListener('pointerup', letGo);
+canvas.addEventListener('pointercancel', letGo);
+// iPhones switch sound on only at the end of a touch
+window.addEventListener('touchend', () => Sound.unlock());
+// no scrolling, zooming or text-selecting while playing
+canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
 
 /* =====================================================================
@@ -1214,23 +1294,28 @@ function sayIntro() {
 }
 function progress() { game.lastProgress = game.time; } // Michael did something right
 // Clicks and taps: menu cards, the home button, the pat bubble
+// Returns true when the tap was used here (so Michael doesn't walk to it)
 function handlePointer(e) {
-  const x = (e.clientX - view.offX) / view.scale, y = (e.clientY - view.offY) / view.scale;
-  if (game.fade) return;
+  const { x, y } = toWorld(e);
+  if (game.fade) return true;
   if (game.mode === 'menu') {
     MENU_CARDS.forEach((mode, i) => {
       const r = menuCardRect(i);
       if (x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h) { game.menuIndex = i; startMode(mode); }
     });
-    return;
+    return true;
   }
-  if (Math.hypot(x - HOME_BUTTON.x, y - HOME_BUTTON.y) < HOME_BUTTON.r + 6) { goMenu(); return; }
-  if (Math.hypot(x - HELP_BUTTON.x, y - HELP_BUTTON.y) < HELP_BUTTON.r + 6) { game.lastHelp = -99; sayIntro(); return; }
-  if (game.complete) { if (game.complete.t > 1.5) goMenu(); return; }
+  const slack = touchMode ? 22 : 6; // fingers are bigger than mouse pointers
+  if (Math.hypot(x - HOME_BUTTON.x, y - HOME_BUTTON.y) < HOME_BUTTON.r + slack) { goMenu(); return true; }
+  if (Math.hypot(x - HELP_BUTTON.x, y - HELP_BUTTON.y) < HELP_BUTTON.r + slack) { game.lastHelp = -99; sayIntro(); return true; }
+  if (game.complete) { if (game.complete.t > 1.5) goMenu(); return true; }
   if (game.petTarget) {
-    const p = promptPos(game.petTarget);
-    if (Math.hypot(x - p.x, y - p.y) < 45) petCreature(game.petTarget);
+    // the pat bubble, or the creature itself
+    const p = promptPos(game.petTarget), cr = game.petTarget;
+    if (Math.hypot(x - p.x, y - p.y) < (touchMode ? 70 : 45) ||
+        (touchMode && Math.hypot(x - cr.x, y - (cr.y - 40 * (cr.size || 1))) < 90)) { petCreature(game.petTarget); return true; }
   }
+  return false;
 }
 
 function startMode(mode) {
@@ -1250,7 +1335,7 @@ function goMenu() {
 }
 // Puts everything back in place so each activity starts fresh
 function resetWorldForMode(mode) {
-  Sound.stopEngine(); Sound.stopTunes();
+  Sound.stopEngine(); Sound.stopTunes(); walkTo.on = false;
   game.scene = 'world'; game.complete = null; game.finishIn = 0;
   game.flight = null; game.parade = null; game.paradeDelay = 0; game.skyTarget = C.sky;
   game.petTarget = null; game.patAnim = null; game.fedCount = 0;
@@ -1740,6 +1825,7 @@ function flightAltitude(u) {
   return 175 * smooth(Math.min(up, down));
 }
 function startFlight() {
+  walkTo.on = false;
   game.flight = { phase: 'boarding', t: 0, bt: 0, fromX: michael.x, fromY: michael.y, cloudT: 0, clouds: [] };
   michael.vx = michael.vy = 0;
   Sound.boing(1.4); Sound.chirp(1.2);
@@ -1832,6 +1918,7 @@ function updateFade(dt) {
   if (f.t >= 0.7) game.fade = null;
 }
 function enterHouse() {
+  walkTo.on = false;
   Sound.chirp(1.1);
   fadeTo(() => {
     game.scene = 'house';
@@ -1843,6 +1930,7 @@ function enterHouse() {
   });
 }
 function leaveHouse() {
+  walkTo.on = false;
   Sound.chirp(0.9);
   fadeTo(() => {
     game.scene = 'world';
@@ -1876,6 +1964,14 @@ function updateMichael(dt, bounds) {
   let iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
   const len = Math.hypot(ix, iy) || 1;
   ix /= len; iy /= len;
+  if (walkTo.on) {
+    // toward the tapped spot (kept inside the area he can walk in)
+    const tx = clamp(walkTo.x, bounds.x1 + bounds.halfWidth, bounds.x2 - bounds.halfWidth);
+    const ty = clamp(walkTo.y, bounds.y1, bounds.y2);
+    const dx = tx - michael.x, dy = ty - michael.y, d = Math.hypot(dx, dy);
+    if (d < 14) { if (walkTo.held === null) walkTo.on = false; }
+    else { const slow = Math.min(1, d / 60); ix = (dx / d) * slow; iy = (dy / d) * slow; }
+  }
   const speed = CONFIG.MOVE_SPEED * (bounds.speedScale || 1);
   const k = 1 - Math.exp(-CONFIG.MOVE_SMOOTHNESS * dt); // smooth speeding up / slowing down
   michael.vx += (ix * speed - michael.vx) * k;
@@ -2793,7 +2889,7 @@ function drawPetPrompt(c) {
   circle(c, 0, 0, 28, '#ffffff');
   c.strokeStyle = '#ffd23f'; c.lineWidth = 5; c.beginPath(); c.arc(0, 0, 28, 0, TAU); c.stroke();
   drawHand(c, 0, 9, 0.8, Math.sin(game.time * 8) * 0.15);
-  drawSpaceKey(c, 0, 44, 0.9);
+  if (!touchMode) drawSpaceKey(c, 0, 44, 0.9);
   c.restore();
 }
 function drawPatHand(c) {
@@ -2884,7 +2980,7 @@ function drawMenuCard(c, i, mode, selected) {
   roundRect(c, -lw / 2, -lh / 2, lw, lh, lh / 2, selected ? '#ffd23f' : '#ffffff', selected ? '#e09b00' : '#9ec5ff', 4);
   drawHebrewText(c, name, 0, 2, size, '#2b1d3a', null, 0);
   c.restore();
-  if (selected) drawSpaceKey(c, lx, ly + 44, 1.2);
+  if (selected && !touchMode) drawSpaceKey(c, lx, ly + 44, 1.2);
 }
 function drawCardScene(c, mode, w, h) {
   const t = game.time, bottom = h / 2;
@@ -3280,7 +3376,15 @@ function drawHUD(c) {
   }
 
   // Arrow-key hint until Michael first moves
-  if (!game.started && !game.complete) {
+  if (!game.started && !game.complete && touchMode && game.mode !== 'menu' && !michael.hidden) {
+    // a finger tapping the ground next to Michael: "touch to walk"
+    const hx = michael.x + 150, hy = michael.y - 10, u = (t * 1.2) % 1;
+    c.save();
+    c.globalAlpha = 1 - u; c.strokeStyle = '#ffffff'; c.lineWidth = 5;
+    c.beginPath(); c.ellipse(hx, hy, 14 + u * 40, (14 + u * 40) * 0.5, 0, 0, TAU); c.stroke();
+    c.restore();
+    drawHand(c, hx + 6, hy - 38 - Math.abs(Math.sin(t * Math.PI * 1.2)) * 16, 1.3, Math.PI); // fingertip on the ring
+  } else if (!game.started && !game.complete && !touchMode) {
     const p = 1 + Math.sin(t * 4) * 0.06;
     c.save(); c.translate(WORLD_W / 2, WORLD_H - 230); c.scale(p, p);
     const keyBox = (x, y, rot) => {
@@ -3303,7 +3407,9 @@ function draw() {
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.fillStyle = '#1d2f6b';
   c.fillRect(0, 0, canvas.width, canvas.height);
-  c.setTransform(view.dpr * view.scale, 0, 0, view.dpr * view.scale, view.offX * view.dpr, view.offY * view.dpr);
+  const k = view.dpr * view.scale;
+  if (view.rotated) c.setTransform(0, k, -k, 0, (window.innerWidth - view.offY) * view.dpr, view.offX * view.dpr); // turned a quarter
+  else c.setTransform(k, 0, 0, k, view.offX * view.dpr, view.offY * view.dpr);
   c.save();
   c.beginPath(); c.rect(0, 0, WORLD_W, WORLD_H); c.clip();
   if (game.scene === 'world') drawWorld(c);

@@ -43,3 +43,14 @@ Any file that is missing falls back to the computer's Hebrew voice.
 | pet_hint.mp3 | לחץ על הרווח כדי ללטף! |
 | house_intro.mp3 | זה הבית. לך אל הטלוויזיה כדי להחליף ערוץ. כדי לצאת, לך למטה אל השטיח. |
 | great_job.mp3 | כל הכבוד מיכאל! הצלחת! |
+
+Said instead on a phone or tablet (they talk about touching instead of the keys):
+
+| File | Sentence |
+| --- | --- |
+| menu_hello_touch.mp3 | שלום מיכאל! ברוך הבא לארץ המטוסים. גע במשחק כדי לשחק. |
+| menu_again_touch.mp3 | מה נשחק עכשיו? גע במשחק שאתה רוצה. |
+| sky_intro_touch.mp3 | צובעים את השמיים! בשלג מסתתרים חמישה כפתורים צבעוניים. גע במסך כדי ללכת, ומצא אותם. כל כפתור צובע את השמיים בצבע אחר! |
+| plane_intro_touch.mp3 | טסים במטוס! גע במטוס הצהוב כדי ללכת אליו, והוא ייקח אותך לטיסה מעל כל העיר. |
+| free_intro_touch.mp3 | טיול חופשי! גע במסך כדי ללכת לכל מקום. כשאתה ליד דרקון או דינוזאור, גע בו כדי ללטף אותו. אפשר גם להיכנס לבית הסגול ולראות טלוויזיה. |
+| pet_hint_touch.mp3 | גע בו כדי ללטף אותו! |
