@@ -42,6 +42,7 @@ jobs:
           ")
           rm models.json
           export GEMINI_TTS_MODEL
+          export GEMINI_TTS_FALLBACK=gemini-2.5-flash-preview-tts
           echo "GEMINI_TTS_MODEL=$GEMINI_TTS_MODEL" >> "$GITHUB_ENV"
           echo "Using $GEMINI_TTS_MODEL"
           # tools/remake.txt (if there) lists just the ids to remake; otherwise all are remade.
@@ -54,12 +55,23 @@ jobs:
           done
           python3 tools/check_voices.py
       - name: Commit the files
+        if: always()
         run: |
+          # keep every file that passed; a file that didn't goes back to what it was before
+          bad=$(cat bad_voices.txt 2>/dev/null || true)
+          for id in $bad; do
+            f=assets/voice/$id.mp3
+            if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git checkout HEAD -- "$f"; else rm -f "$f"; fi
+          done
           rm -f bad_voices.txt
-          git rm -q --ignore-unmatch tools/remake.txt
+          # what still needs making stays in tools/remake.txt for the next run
+          if [ -n "$bad" ]; then echo "$bad" > tools/remake.txt; git add tools/remake.txt
+          else git rm -q --ignore-unmatch tools/remake.txt; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git add assets/voice
           git diff --cached --quiet && exit 0
-          git commit -m "Remake Hebrew voice files with ${GEMINI_TTS_MODEL:-gemini-2.5-flash-preview-tts} (all checked)"
-          git push
+          git commit -m "Remake Hebrew voice files with ${GEMINI_TTS_MODEL:-gemini-2.5-flash-preview-tts} (checked)"
+          # the branch may have moved on while the voices were being made
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"

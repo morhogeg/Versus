@@ -15,6 +15,7 @@ import base64, json, os, re, subprocess, sys, time, urllib.request, urllib.error
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'voice')
 MODEL = os.environ.get('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts')
+FALLBACK = os.environ.get('GEMINI_TTS_FALLBACK', '')  # used when MODEL's daily limit is used up
 VOICE = os.environ.get('GEMINI_TTS_VOICE', 'Leda')  # a warm, youthful voice
 STYLE = ('Read this aloud in Hebrew, in a warm, happy, gentle voice, like a kind kindergarten teacher '
          'talking to a 4-year-old boy named Michael (he is a boy, so use masculine Hebrew forms). Speak clearly and a little slowly, with a smile. '
@@ -114,6 +115,11 @@ def main():
                 time.sleep(PACE)
                 break
             except QuotaError as e:
+                global MODEL, FALLBACK
+                if e.daily and FALLBACK and FALLBACK != MODEL:
+                    print(f'{MODEL} has no requests left today, switching to {FALLBACK}')
+                    MODEL, FALLBACK = FALLBACK, ''
+                    continue
                 if e.daily:
                     sys.exit('Stopped: the Gemini daily quota for ' + MODEL + ' is used up. Run again tomorrow.\n' + str(e))
                 print('wait', vid, f'(quota per minute, waiting {e.wait}s)')

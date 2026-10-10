@@ -62,7 +62,8 @@ def main():
         if heard is None:
             print('ERROR  ', vid); bad.append(vid); continue
         time.sleep(4)
-        score = difflib.SequenceMatcher(None, plain(text), plain(heard)).ratio()
+        # spaces don't count: a quick 'גע בו' is often written down as one word
+        score = difflib.SequenceMatcher(None, plain(text).replace(' ', ''), plain(heard).replace(' ', '')).ratio()
         ok = score >= 0.95
         print('ok     ' if ok else 'BAD    ', vid, f'{score:.2f}', '|', plain(heard))
         if not ok: bad.append(vid)
