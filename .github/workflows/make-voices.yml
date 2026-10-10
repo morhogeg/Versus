@@ -9,6 +9,7 @@ on:
       - .github/workflows/make-voices.yml
       - tools/make_voices.py
       - tools/check_voices.py
+      - tools/remake.txt
 
 permissions:
   contents: write
@@ -43,7 +44,9 @@ jobs:
           export GEMINI_TTS_MODEL
           echo "GEMINI_TTS_MODEL=$GEMINI_TTS_MODEL" >> "$GITHUB_ENV"
           echo "Using $GEMINI_TTS_MODEL"
-          python3 tools/make_voices.py --all || true
+          # tools/remake.txt (if there) lists just the ids to remake; otherwise all are remade.
+          if [ -s tools/remake.txt ]; then python3 tools/make_voices.py $(cat tools/remake.txt) || true
+          else python3 tools/make_voices.py --all || true; fi
           # A Gemini model listens to every file; any file that doesn't say its sentence is made again.
           for round in 1 2 3; do
             if python3 tools/check_voices.py; then rm -f bad_voices.txt; exit 0; fi
@@ -53,9 +56,10 @@ jobs:
       - name: Commit the files
         run: |
           rm -f bad_voices.txt
+          git rm -q --ignore-unmatch tools/remake.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
-          git add assets/voice
+          git add assets/voice tools
           git diff --cached --quiet && exit 0
           git commit -m "Remake Hebrew voice files with ${GEMINI_TTS_MODEL:-gemini-2.5-flash-preview-tts} (all checked)"
           git push
