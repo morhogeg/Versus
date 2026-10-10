@@ -31,9 +31,11 @@ def call(url, headers, body):
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)
 
-def synthesize(text, key):
+def synthesize(text, key, attempt=0):
+    # Very short lines (one word) sometimes come back without audio, so later tries ask a little differently.
+    prompt = STYLE + text if attempt < 2 else STYLE + 'Say it once, cheerfully: ' + text
     body = {
-        'contents': [{'role': 'user', 'parts': [{'text': STYLE + text}]}],
+        'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
         'generationConfig': {
             'responseModalities': ['AUDIO'],
             'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': VOICE}}},
@@ -47,7 +49,10 @@ def synthesize(text, key):
     for url, extra in endpoints:
         try:
             data = call(url, {'Content-Type': 'application/json', **extra}, body)
-            part = data['candidates'][0]['content']['parts'][0]['inlineData']
+            cand = data['candidates'][0]
+            if 'content' not in cand:
+                raise RuntimeError('no audio, finishReason=' + str(cand.get('finishReason')))
+            part = cand['content']['parts'][0]['inlineData']
             return base64.b64decode(part['data']), part.get('mimeType', '')
         except urllib.error.HTTPError as e:
             errors.append(f'{url.split("/")[2]}: HTTP {e.code} {e.read()[:300].decode(errors="replace")}')
@@ -67,13 +72,14 @@ def main():
     lines = read_lines()
     wanted = [a for a in sys.argv[1:] if not a.startswith('--')]
     os.makedirs(OUT, exist_ok=True)
+    failed = []
     for vid, text in lines.items():
         path = os.path.join(OUT, vid + '.mp3')
         if wanted and vid not in wanted: continue
         if not wanted and '--all' not in sys.argv and os.path.exists(path): continue
-        for attempt in range(4):
+        for attempt in range(6):
             try:
-                pcm, mime = synthesize(text, key)
+                pcm, mime = synthesize(text, key, attempt)
                 to_mp3(pcm, mime, path)
                 print('ok  ', vid)
                 break
@@ -81,7 +87,9 @@ def main():
                 print('fail', vid, f'(try {attempt + 1})\n ', e)
                 time.sleep(5 * (attempt + 1))
         else:
-            sys.exit('Stopped: could not make ' + vid)
+            failed.append(vid)
+    if failed:
+        sys.exit('Could not make: ' + ' '.join(failed))
 
 if __name__ == '__main__':
     main()
