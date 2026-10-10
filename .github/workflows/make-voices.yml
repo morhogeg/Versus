@@ -27,23 +27,6 @@ jobs:
             echo "::error::Add the GEMINI_API_KEY repository secret, then re-run this job."
             exit 1
           fi
-          # Find the Gemini 3.8 Flash-Lite TTS model name in Google's model list.
-          curl -sS -H "x-goog-api-key: $GEMINI_API_KEY" \
-            "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000" > models.json
-          GEMINI_TTS_MODEL=$(python3 - <<'PY'
-          import json, sys
-          names = [m['name'].split('/')[-1] for m in json.load(open('models.json')).get('models', [])]
-          tts = [n for n in names if 'tts' in n]
-          print('TTS models:', ', '.join(tts) or 'none', file=sys.stderr)
-          pick = [n for n in tts if '3.8' in n and 'flash-lite' in n]
-          if not pick: sys.exit('No Gemini 3.8 Flash-Lite TTS model found')
-          print(sorted(pick, key=len)[0])
-          PY
-          )
-          rm models.json
-          export GEMINI_TTS_MODEL
-          echo "GEMINI_TTS_MODEL=$GEMINI_TTS_MODEL" >> "$GITHUB_ENV"
-          echo "Using model: $GEMINI_TTS_MODEL"
           python3 tools/make_voices.py --all
           ls -l assets/voice
       - name: Commit the files
@@ -53,5 +36,5 @@ jobs:
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git add assets/voice
           git diff --cached --quiet && exit 0
-          git commit -m "Remake Hebrew voice files with ${GEMINI_TTS_MODEL:-Gemini}"
+          git commit -m "Remake Hebrew voice files with gemini-3.8-flash-lite-tts"
           git push

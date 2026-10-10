@@ -14,7 +14,7 @@ import base64, json, os, re, subprocess, sys, time, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'voice')
-MODEL = os.environ.get('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts')
+MODEL = os.environ.get('GEMINI_TTS_MODEL', 'gemini-3.8-flash-lite-tts')
 VOICE = os.environ.get('GEMINI_TTS_VOICE', 'Leda')  # a warm, youthful voice
 STYLE = ('Read this aloud in Hebrew, in a warm, happy, gentle voice, like a kind kindergarten teacher '
          'talking to a 4-year-old boy named Michael. Speak clearly and a little slowly, with a smile. '
