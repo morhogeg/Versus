@@ -24,7 +24,7 @@ The fallback voice is the computer's own Hebrew voice:
 
 If there's no Hebrew voice, the text still appears.
 
-**Your own voice (or any voice you like):** `assets/voice/LINES.md` lists every sentence with its file name. Record them (or generate them with any text-to-speech site), save them into `assets/voice/` with those names, and set `VOICE_FILES: 'mp3'` in `CONFIG`. Missing files fall back to the computer's voice. The sentences themselves are in `VOICE_LINES` in `game.js` if you want to change the wording.
+**Your own voice (or any voice you like):** `assets/voice/LINES.md` lists every sentence with its file name. Record them (or generate them with any text-to-speech site) and save them into `assets/voice/` with those names, replacing the Gemini files. The sentences themselves are in `VOICE_LINES` in `game.js` if you want to change the wording; after changing one, remake its file with `GEMINI_API_KEY=... python3 tools/make_voices.py <id>` and check it with `tools/check_voices.py`, or just run the "Make voice files" GitHub Action, which remakes and checks all of them.
 
 The five activities each end with a big smiling star and Michael cheering, then the menu comes back. **Free play** (the last card) has everything switched on and never ends, and it's the only mode where he can go into the house.
 

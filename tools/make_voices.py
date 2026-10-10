@@ -19,6 +19,11 @@ VOICE = os.environ.get('GEMINI_TTS_VOICE', 'Leda')  # a warm, youthful voice
 STYLE = ('Read this aloud in Hebrew, in a warm, happy, gentle voice, like a kind kindergarten teacher '
          'talking to a 4-year-old boy named Michael. Speak clearly and a little slowly, with a smile. '
          'Say only the sentence, exactly as written:\n')
+# Flash-Lite reads a style note in the message aloud, so for it the note goes in the system instruction instead.
+LITE = 'lite' in MODEL
+SYSTEM = ('You read Hebrew sentences aloud for a 4-year-old boy named Michael: a warm, happy, gentle voice, '
+          'like a kind kindergarten teacher, clear and a little slow, with a smile. Say only the sentence you are given.')
+use_system = True  # turned off if the model refuses a system instruction
 
 def read_lines():
     src = open(os.path.join(ROOT, 'game.js'), encoding='utf-8').read()
@@ -32,10 +37,10 @@ def call(url, headers, body):
         return json.load(r)
 
 def synthesize(text, key, attempt=0):
+    global use_system
     # Very short lines (one word) sometimes come back without audio, so later tries ask a little differently.
     prompt = STYLE + text if attempt < 2 else STYLE + 'Say it once, cheerfully: ' + text
-    if 'lite' in MODEL:  # Flash-Lite reads instructions aloud instead of following them, so send only the sentence
-        prompt = text
+    if LITE: prompt = text
     body = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
         'generationConfig': {
@@ -43,6 +48,8 @@ def synthesize(text, key, attempt=0):
             'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': VOICE}}},
         },
     }
+    if LITE and use_system:
+        body['systemInstruction'] = {'parts': [{'text': SYSTEM}]}
     endpoints = [
         (f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent', {'x-goog-api-key': key}),
         (f'https://aiplatform.googleapis.com/v1/publishers/google/models/{MODEL}:generateContent?key={key}', {}),
@@ -57,6 +64,8 @@ def synthesize(text, key, attempt=0):
             part = cand['content']['parts'][0]['inlineData']
             return base64.b64decode(part['data']), part.get('mimeType', '')
         except urllib.error.HTTPError as e:
+            if e.code == 400 and 'systemInstruction' in body:
+                use_system = False  # try again without it
             errors.append(f'{url.split("/")[2]}: HTTP {e.code} {e.read()[:300].decode(errors="replace")}')
         except Exception as e:  # network blocked, unexpected answer...
             errors.append(f'{url.split("/")[2]}: {e}')
@@ -82,6 +91,14 @@ def main():
         for attempt in range(6):
             try:
                 pcm, mime = synthesize(text, key, attempt)
+                rate = int(re.search(r'rate=(\d+)', mime).group(1)) if 'rate=' in mime else 24000
+                secs = len(pcm) / 2 / rate
+                if secs > 2.5 + 0.15 * len(text):  # far longer than the sentence: it read something else aloud too
+                    global use_system
+                    use_system = False  # in case the style note was read aloud
+                    raise RuntimeError(f'audio is {secs:.1f}s, too long for {len(text)} letters')
+                if secs < 0.4:
+                    raise RuntimeError(f'audio is only {secs:.1f}s')
                 to_mp3(pcm, mime, path)
                 print('ok  ', vid)
                 break

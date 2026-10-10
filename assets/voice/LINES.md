@@ -1,7 +1,7 @@
 # Voice lines to record
 
 Record each sentence and save it in this folder with the file name shown (all in the same format, e.g. .mp3).
-Then open game.js and set  VOICE_FILES: 'mp3'  in the CONFIG block.
+The game already plays these files (VOICE_FILES: 'mp3' in the CONFIG block of game.js).
 Any file that is missing falls back to the computer's Hebrew voice.
 
 | File | Sentence |
