@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1d2f6b">
+  <title>Airplane's Land</title>
+  <!-- Rounded Hebrew font for the game names and subtitles (falls back to Arial when offline) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #1d2f6b;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none; /* fingers walk Michael instead of scrolling or zooming */
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!--
+    michael-data.js holds the same picture as assets/michael.png, written as text.
+    Browsers block reading the pixels of a picture when index.html is opened straight
+    from disk (file://), and we need the pixels to cut out the white background.
+    If you change michael.png, see README.md for the one-line command that rebuilds it.
+  -->
+  <script src="assets/michael-data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
