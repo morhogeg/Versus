@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Airplane's Land</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #1d2f6b;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!--
+    michael-data.js holds the same picture as assets/michael.png, written as text.
+    Browsers block reading the pixels of a picture when index.html is opened straight
+    from disk (file://), and we need the pixels to cut out the white background.
+    If you change michael.png, see README.md for the one-line command that rebuilds it.
+  -->
+  <script src="assets/michael-data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
